@@ -1,0 +1,32 @@
+{% extends "public_base.html" %}
+{% set hide_nav = true %}
+{% set active = 'landing' %}
+{% block title %}{{ facility_name }}{% endblock %}
+{% block content %}
+
+<div style="min-height: calc(100vh - 8rem); display: flex; align-items: center; justify-content: center; padding: 2rem 1rem;">
+
+  <div style="max-width: 720px; display: flex; flex-direction: column; align-items: center; gap: 2rem; text-align: center;">
+
+    <span class="chip chip-primary mono" style="padding: 0.35rem 0.85rem;">
+      <span class="pulse pulse-info" style="display: inline-block; width: 6px; height: 6px; margin-right: 0.4rem;"></span>
+      Smart Laundry Node • {{ facility_location }}
+    </span>
+
+    <h1 class="t-2xl" style="font-size: 44px; line-height: 1.15; margin: 0;">
+      Welcome to <span class="accent-primary">{{ facility_name }}</span>
+    </h1>
+
+    <p class="t-lg muted" style="max-width: 560px; margin: 0;">
+      Pay-per-weight self-service laundry with hardware-gated activation. Weigh your load, receive a QR voucher at the counter, and unlock the machine by scanning.
+    </p>
+
+    <a href="/access" class="action action-primary" style="padding: 1rem 2.25rem; font-size: 13px; margin-top: 0.5rem;">
+      Proceed to Login →
+    </a>
+
+  </div>
+
+</div>
+
+{% endblock %}

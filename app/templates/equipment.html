@@ -1,0 +1,407 @@
+{% extends "base.html" %}
+{% set active = 'equipment' %}
+{% block title %}Equipment — {{ facility_name }}{% endblock %}
+{% block content %}
+
+<div style="display: flex; flex-direction: column; gap: 0.6rem;">
+
+  <div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 1rem; flex-wrap: wrap;">
+    <div style="display: flex; flex-direction: column; gap: 0.15rem;">
+      <div class="mono t-xs muted caps">Admin Console</div>
+      <h1 class="t-xl semibold" style="margin: 0;">Equipment &amp; Vouchers</h1>
+    </div>
+    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+      <button class="action action-secondary" onclick="promptAddStation()">+ Add Station</button>
+      <a href="/journal" class="action action-secondary">View Journal</a>
+    </div>
+  </div>
+
+  <div class="grid grid-4" style="gap: 0.6rem;">
+    {% for unit in units %}
+    <div class="panel panel-low station-mini" style="padding: 0.9rem;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+        <span class="mono semibold accent-primary">Bay #{{ '%02d'|format(unit.station_number) }}</span>
+        <span class="chip {% if unit.state.value == 'running' %}chip-primary{% elif unit.state.value == 'available' %}chip-tertiary{% elif unit.state.value == 'finished' %}chip-tertiary{% else %}chip-muted{% endif %}" style="font-size: 9px; padding: 0.1rem 0.4rem;">{{ unit.state.value }}</span>
+      </div>
+
+      <div style="text-align: center; margin-bottom: 0.5rem; padding: 0.4rem; background: var(--surface-lowest); border-radius: 0.5rem;">
+        <div class="t-lg mono semibold">{{ '%.2f'|format(unit.load_kg) }}<span class="t-xs muted">kg</span></div>
+        <div class="mono t-xs muted">{{ format_temperature(unit.temperature_celsius) }} • {{ format_rotation(unit.rotation_rpm) }}</div>
+      </div>
+
+      <div class="grid grid-2" style="gap: 0.3rem; margin-bottom: 0.5rem; font-size: 10px;">
+        <div class="mono muted">Door: <span style="color: var(--on-surface);">{{ 'Closed' if unit.is_door_closed else 'Open' }}</span></div>
+        <div class="mono muted">Seal: <span style="color: var(--on-surface);">{{ 'Latched' if unit.is_sealed else 'Free' }}</span></div>
+      </div>
+
+      <div class="grid grid-2" style="gap: 0.3rem; margin-bottom: 0.3rem;">
+        <button class="action action-secondary" style="justify-content: center; font-size: 10px; padding: 0.4rem;" onclick="toggleSeal({{ unit.id }}, {{ 'true' if unit.is_sealed else 'false' }})">
+          {% if unit.is_sealed %}Unlock{% else %}Lock{% endif %}
+        </button>
+        <button class="action action-secondary" style="justify-content: center; font-size: 10px; padding: 0.4rem;" onclick="pulseCoil({{ unit.id }})">Pulse</button>
+        <button class="action action-secondary" style="justify-content: center; font-size: 10px; padding: 0.4rem;" onclick="tareScale({{ unit.id }})">Tare</button>
+        <button class="action action-secondary" style="justify-content: center; font-size: 10px; padding: 0.4rem;" onclick="promptCycleState({{ unit.id }})">State</button>
+      </div>
+
+      <div class="grid grid-2" style="gap: 0.3rem;">
+        <button class="action action-primary" style="justify-content: center; font-size: 10px; padding: 0.4rem;" onclick="quickIssue({{ unit.station_number }})">Issue QR</button>
+        <button class="action action-danger" style="justify-content: center; font-size: 10px; padding: 0.4rem;" onclick="confirmDeleteEquipment({{ unit.id }})">Delete</button>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="equipment-split">
+
+    <div class="panel overview-panel">
+      <div class="overview-panel-header">
+        <h2 class="t-lg semibold">Client Accounts</h2>
+        <span class="mono t-xs muted">{{ accounts|length }} total</span>
+      </div>
+      <div class="overview-panel-body">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Contact</th>
+              <th>Role</th>
+              <th>Balance</th>
+              <th class="text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for acct in accounts %}
+            <tr>
+              <td class="semibold">{{ acct.display_name }}</td>
+              <td class="mono t-xs">{{ acct.contact_number }}</td>
+              <td><span class="chip {% if acct.role.value == 'admin' %}chip-tertiary{% else %}chip-primary{% endif %}" style="font-size: 9px;">{{ acct.role.value }}</span></td>
+              <td class="mono accent-tertiary bold" id="balance-{{ acct.id }}">{{ format_currency(acct.balance) }}</td>
+              <td class="text-right">
+                <div style="display: flex; gap: 0.3rem; justify-content: flex-end; flex-wrap: wrap;">
+                  <button class="action action-secondary" style="font-size: 10px; padding: 0.3rem 0.6rem;" onclick="creditAccount({{ acct.id }}, 500)">+500</button>
+                  <button class="action action-secondary" style="font-size: 10px; padding: 0.3rem 0.6rem;" onclick="creditAccount({{ acct.id }}, 1000)">+1000</button>
+                  <button class="action action-secondary" style="font-size: 10px; padding: 0.3rem 0.6rem;" onclick="promptDeduct({{ acct.id }})">−</button>
+                  <button class="action action-primary" style="font-size: 10px; padding: 0.3rem 0.6rem;" onclick="promptSetBalance({{ acct.id }})">Set</button>
+                  <button class="action action-danger" style="font-size: 10px; padding: 0.3rem 0.6rem; border-color: var(--accent-error); color: var(--accent-error);" onclick="confirmResetBalance({{ acct.id }}, '{{ acct.display_name }}')">Reset</button>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel overview-panel">
+      <div class="overview-panel-header">
+        <h2 class="t-lg semibold">Voucher Tools</h2>
+        <span class="mono t-xs muted">Signed · one-time</span>
+      </div>
+      <div class="overview-panel-body">
+        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+          <div class="panel panel-low" style="padding: 1rem; text-align: center;">
+            <div style="margin: 0 auto 0.5rem; font-size: 1.5rem; color: var(--accent-primary);">&#9635;</div>
+            <div class="t-md semibold" style="margin-bottom: 0.25rem;">Generate Signed QR</div>
+            <div class="t-xs muted" style="margin-bottom: 0.75rem;">Creates a one-time voucher. Download the PNG and send it to the client.</div>
+            <button class="action action-primary w-full" style="justify-content: center;" onclick="openQRGenerator()">Open Generator</button>
+          </div>
+          <div class="panel panel-low" style="padding: 0.75rem;">
+            <div class="mono t-xs muted caps" style="margin-bottom: 0.5rem;">Recent Vouchers</div>
+            <table style="font-size: 11px;">
+              <tbody>
+                {% for instrument in instruments[:6] %}
+                <tr>
+                  <td class="mono accent-primary">{{ instrument.code }}</td>
+                  <td class="mono">Bay #{{ '%02d'|format(instrument.station_number) }}</td>
+                  <td class="mono accent-tertiary">{{ format_currency(instrument.value) }}</td>
+                  <td class="text-right"><span class="chip {% if instrument.is_consumed %}chip-muted{% else %}chip-tertiary{% endif %}" style="font-size: 8px;">{{ 'Used' if instrument.is_consumed else 'Active' }}</span></td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<div id="genModal" class="modal-backdrop" hidden>
+  <div class="modal-window" style="max-width: 24rem;">
+    <div style="margin-bottom: 1rem; font-size: 1.5rem; color: var(--accent-primary);">&#9635;</div>
+    <div class="modal-title">Generate Voucher</div>
+    <div class="modal-message" style="margin-bottom: 1rem;">Choose the station, load weight, and cycle program.</div>
+    <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+      <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+        <label class="mono t-xs muted caps">Station</label>
+        <select id="genStation" class="field mono">
+          {% for unit in units %}
+          <option value="{{ unit.station_number }}">Bay #{{ '%02d'|format(unit.station_number) }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+        <label class="mono t-xs muted caps">Weight (kg)</label>
+        <input id="genWeight" type="number" step="0.1" min="{{ hardware_minimum_kg }}" max="{{ hardware_max_load_kg }}" value="5.0" class="field mono">
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+        <label class="mono t-xs muted caps">Cycle Program</label>
+        <select id="genCycle" class="field mono">
+          {% for key, program in cycle_programs.items() %}
+          <option value="{{ key }}">{{ program.label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer" style="padding-top: 1rem; margin-top: 1rem;">
+      <button class="action action-secondary" style="min-width: 6rem; justify-content: center;" onclick="closeGenModal()">Cancel</button>
+      <button class="action action-primary" style="min-width: 8rem; justify-content: center;" onclick="submitGenerate()">Generate</button>
+    </div>
+  </div>
+</div>
+
+<div id="qrModal" class="modal-backdrop" hidden>
+  <div class="modal-window" style="max-width: 22rem; text-align: center;">
+    <div style="margin-bottom: 1rem; font-size: 1.5rem; color: var(--accent-primary);">&#9635;</div>
+    <div class="modal-title" style="text-align: center;">Voucher QR</div>
+    <div class="modal-message" style="text-align: center; margin-bottom: 1rem;">Download the PNG and send it to the client.</div>
+    <div id="qrContainer" style="background: white; padding: 12px; border-radius: 0.75rem; display: inline-block; margin-bottom: 0.75rem; min-width: 200px; min-height: 200px;"></div>
+    <div class="mono t-sm accent-tertiary semibold" id="qrCodeLabel" style="margin-bottom: 0.25rem;">—</div>
+    <div class="mono t-xs muted" id="qrMeta" style="margin-bottom: 1rem;">—</div>
+    <div style="display: flex; gap: 0.5rem; padding-top: 1rem; border-top: 1px solid var(--outline-variant);">
+      <button class="action action-secondary" style="flex: 1; justify-content: center;" onclick="closeQRModal()">Close</button>
+      <button class="action action-tertiary" style="flex: 1; justify-content: center;" onclick="downloadQR()">Download PNG</button>
+    </div>
+    <button class="action action-primary" style="width: 100%; justify-content: center; margin-top: 0.5rem;" onclick="copyQRToken()">Copy Code</button>
+  </div>
+</div>
+
+<script src="/static/js/qrcode.min.js"></script>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  let currentCode = "";
+
+  function openQRGenerator() { document.getElementById("genModal").hidden = false; }
+  function closeGenModal() { document.getElementById("genModal").hidden = true; }
+
+  function quickIssue(station) {
+    document.getElementById("genStation").value = station;
+    openQRGenerator();
+  }
+
+  async function submitGenerate() {
+    const station = parseInt(document.getElementById("genStation").value);
+    const weight = parseFloat(document.getElementById("genWeight").value);
+    const cycle = document.getElementById("genCycle").value;
+    if (!weight || weight <= 0) { notify("Invalid Weight", "Enter a value greater than 0.", "error"); return; }
+    closeGenModal();
+    let data;
+    try {
+      const response = await fetch("/api/instruments/issue", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({station_number: station, measured_kg: weight, cycle_key: cycle})
+      });
+      data = await response.json();
+      if (!response.ok) { notify("Failed", data.detail || "Unable to issue voucher.", "error"); return; }
+    } catch (err) {
+      notify("Network Error", err.message, "error");
+      return;
+    }
+    currentCode = data.code || "";
+    document.getElementById("qrCodeLabel").textContent = currentCode;
+    document.getElementById("qrMeta").textContent = "Bay #" + String(station).padStart(2, "0") + " · " + weight.toFixed(2) + " kg";
+    const container = document.getElementById("qrContainer");
+    container.innerHTML = "";
+    if (typeof QRCode !== "undefined" && data.signed_token) {
+      new QRCode(container, {
+        text: data.signed_token,
+        width: 200,
+        height: 200,
+        colorDark: "#000000",
+        colorLight: "#ffffff",
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    }
+    document.getElementById("qrModal").hidden = false;
+    notify("Voucher Issued", "Code: " + currentCode);
+  }
+
+  function closeQRModal() { document.getElementById("qrModal").hidden = true; }
+
+  function downloadQR() {
+    const container = document.getElementById("qrContainer");
+    const img = container.querySelector("img");
+    const canvas = container.querySelector("canvas");
+    const src = img ? img.src : (canvas ? canvas.toDataURL("image/png") : null);
+    if (!src) { notify("Nothing to Download", "Generate a voucher first.", "error"); return; }
+    const link = document.createElement("a");
+    link.download = "voucher-" + currentCode + ".png";
+    link.href = src;
+    link.click();
+  }
+
+  function copyQRToken() {
+    if (!currentCode) return;
+    navigator.clipboard.writeText(currentCode);
+    notify("Copied", "Code: " + currentCode);
+  }
+
+  async function addEquipment(station) {
+    const r = await fetch("/api/equipment/", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({station_number: station, state: "available", load_kg: 0, capacity_kg: {{ hardware_max_load_kg }}})
+    });
+    if (r.ok) {
+      notify("Station Added", "Bay #" + String(station).padStart(2, "0") + " created.");
+      setTimeout(() => location.reload(), 900);
+    } else {
+      notify("Failed", "Could not add station.", "error");
+    }
+  }
+
+  async function promptAddStation() {
+    const value = await promptDialog("Add Station", "Enter the new station number.", "", "number");
+    if (!value) return;
+    const station = parseInt(value);
+    if (!station || station <= 0) { notify("Invalid Input", "Enter a number greater than 0.", "error"); return; }
+    addEquipment(station);
+  }
+
+  async function confirmDeleteEquipment(id) {
+    const ok = await confirmDialog("Delete Station?", "This removes the station and all its data. This cannot be undone.", "Delete");
+    if (ok) removeEquipment(id);
+  }
+
+  async function removeEquipment(id) {
+    const r = await fetch("/api/equipment/" + id, {method: "DELETE"});
+    if (r.ok) {
+      notify("Station Removed", "The station has been deleted.");
+      setTimeout(() => location.reload(), 900);
+    } else {
+      notify("Failed", "Could not delete station.", "error");
+    }
+  }
+
+  async function toggleSeal(id, sealed) {
+    const r = await fetch("/api/equipment/" + id, {
+      method: "PATCH",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({is_sealed: !sealed})
+    });
+    if (r.ok) {
+      notify("Updated", sealed ? "Door unlocked." : "Door locked.");
+      setTimeout(() => location.reload(), 900);
+    }
+  }
+
+  async function pulseCoil(id) {
+    await fetch("/api/equipment/" + id, {
+      method: "PATCH",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({is_sealed: false})
+    });
+    notify("Pulse Sent", "250ms coil pulse dispatched.");
+    setTimeout(() => location.reload(), 900);
+  }
+
+  async function tareScale(id) {
+    const r = await fetch("/api/equipment/" + id, {
+      method: "PATCH",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({load_kg: 0})
+    });
+    if (r.ok) {
+      notify("Tare Complete", "Scale zeroed to 0.000 kg.");
+      setTimeout(() => location.reload(), 900);
+    }
+  }
+
+  async function promptCycleState(id) {
+    const next = await promptDialog("Change Station State", "Type one of: available / running / extracting / finished / out_of_service", "available");
+    if (!next) return;
+    const valid = ["available", "running", "extracting", "finished", "out_of_service"];
+    if (!valid.includes(next)) { notify("Invalid State", "Not a valid state value.", "error"); return; }
+    const r = await fetch("/api/equipment/" + id, {
+      method: "PATCH",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({state: next})
+    });
+    if (r.ok) {
+      notify("State Changed", "New state: " + next);
+      setTimeout(() => location.reload(), 900);
+    }
+  }
+
+  async function creditAccount(id, amount) {
+    const r = await fetch("/api/accounts/" + id + "/credit?amount=" + amount, {method: "POST"});
+    const data = await r.json();
+    if (r.ok) {
+      const cell = document.getElementById("balance-" + id);
+      if (cell) cell.textContent = "₱" + data.balance.toFixed(2);
+      notify("Credited", "New balance: ₱" + data.balance.toFixed(2));
+    } else {
+      notify("Failed", data.detail || "Credit failed.", "error");
+    }
+  }
+
+  async function setBalance(id, amount) {
+    const r = await fetch("/api/accounts/" + id + "/balance?amount=" + amount, {method: "POST"});
+    const data = await r.json();
+    if (r.ok) {
+      const cell = document.getElementById("balance-" + id);
+      if (cell) cell.textContent = "₱" + data.balance.toFixed(2);
+      notify("Balance Set", "New balance: ₱" + data.balance.toFixed(2));
+    } else {
+      notify("Failed", data.detail || "Set failed.", "error");
+    }
+  }
+
+  async function promptDeduct(id) {
+    const value = await promptDialog("Deduct Balance", "Enter the amount to deduct (₱).", "100", "number");
+    if (!value) return;
+    const amount = parseFloat(value);
+    if (!amount || amount <= 0) { notify("Invalid Amount", "Enter a number greater than 0.", "error"); return; }
+    creditAccount(id, -amount);
+  }
+
+  async function promptSetBalance(id) {
+    const value = await promptDialog("Set Balance", "Enter the exact balance (₱).", "0", "number");
+    if (value === null) return;
+    const amount = parseFloat(value);
+    if (isNaN(amount) || amount < 0) { notify("Invalid Amount", "Enter a value 0 or greater.", "error"); return; }
+    setBalance(id, amount);
+  }
+
+  async function resetBalance(id, displayName) {
+    const r = await fetch("/api/accounts/" + id + "/balance?amount=0", {method: "POST"});
+    const data = await r.json();
+    if (r.ok) {
+      const cell = document.getElementById("balance-" + id);
+      if (cell) cell.textContent = "₱0.00";
+      notify("Balance Reset", displayName + "'s wallet is now ₱0.00.", "warning");
+    } else {
+      notify("Failed", data.detail || "Reset failed.", "error");
+    }
+  }
+
+  async function confirmResetBalance(id, displayName) {
+    const ok = await confirmDialog(
+      "Reset " + displayName + "'s Balance?",
+      "This will set the wallet balance to ₱0.00. This cannot be undone.",
+      "Reset to ₱0"
+    );
+    if (ok) resetBalance(id, displayName);
+  }
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { closeGenModal(); closeQRModal(); }
+  });
+</script>
+{% endblock %}

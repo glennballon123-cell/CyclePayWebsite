@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}{{ facility_name }}{% endblock %}</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/theme.css?v=102">
+</head>
+<body>
+
+{% if not hide_nav %}
+<header class="public-header">
+  <div class="brand">
+    <a href="/" class="brand-name" style="text-decoration: none;">{{ facility_name }} <span class="accent">// LAUNDRY</span></a>
+  </div>
+
+    <nav>
+    <a href="/kiosk" {% if active == 'kiosk' %}class="active"{% endif %}>Kiosk</a>
+    <a href="/wallet" {% if active == 'wallet' %}class="active"{% endif %}>Wallet</a>
+    <a href="/progress" {% if active == 'progress' %}class="active"{% endif %}>Progress</a>
+    <a href="/help" {% if active == 'help' %}class="active"{% endif %}>Support</a>
+    <a href="/guide" {% if active == 'guide' %}class="active"{% endif %}>Guide</a>
+   </nav>
+
+  <div class="flex items-center gap-3">
+    {% if account %}
+      {% if account.role.value == 'admin' %}
+        <a href="/overview" class="action action-tertiary">Admin Console</a>
+      {% endif %}
+      <div class="text-right">
+        <div class="t-sm semibold">{{ account.display_name }}</div>
+        <div class="t-xs mono accent-tertiary">{{ format_currency(account.balance) }}</div>
+      </div>
+      <button class="action action-secondary" onclick="signOut()">Logout</button>
+    {% else %}
+      <a href="/access" class="action action-primary">Login</a>
+    {% endif %}
+  </div>
+</header>
+{% endif %}
+
+<main class="public-canvas" {% if hide_nav %}style="padding-top: 2rem;"{% endif %}>
+  {% block content %}{% endblock %}
+</main>
+
+<footer class="public-footer">
+  <div>{{ facility_name }} // {{ facility_location }}</div>
+  <div>BSIT-3B by EJG</div>
+</footer>
+
+<div id="toast" class="toast" hidden>
+  <div class="flex items-center gap-2 mb-1">
+    <span class="pulse pulse-ok"></span>
+    <strong id="toastTitle">Notice</strong>
+  </div>
+  <div id="toastBody" class="t-sm muted"></div>
+</div>
+
+<div id="modalBackdrop" class="modal-backdrop" hidden>
+  <div class="modal-window">
+    <div class="flex justify-between items-center mb-3">
+      <h3 id="modalHeading" class="t-xl">Details</h3>
+      <button class="action action-secondary" onclick="closeModal()">Close</button>
+    </div>
+    <div id="modalContent" class="t-md muted"></div>
+  </div>
+</div>
+
+<script>
+  function notify(title, body) {
+    if (window.__suppressToast) return;
+    const node = document.getElementById('toast');
+    document.getElementById('toastTitle').textContent = title;
+    document.getElementById('toastBody').textContent = body;
+    node.hidden = false;
+    setTimeout(() => { node.hidden = true; }, 4000);
+  }
+  function openModal(heading, html) {
+    document.getElementById('modalHeading').textContent = heading;
+    document.getElementById('modalContent').innerHTML = html;
+    document.getElementById('modalBackdrop').hidden = false;
+  }
+  function closeModal() {
+    document.getElementById('modalBackdrop').hidden = true;
+  }
+  async function signOut() {
+    await fetch('/api/accounts/deauthenticate', {method: 'POST'});
+    window.location.href = '/';
+  }
+</script>
+
+{% block scripts %}{% endblock %}
+</body>
+</html>

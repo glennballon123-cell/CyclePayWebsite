@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% set active = 'overview' %}
+{% block title %}Overview — {{ facility_name }}{% endblock %}
+{% block content %}
+
+<div style="display: flex; flex-direction: column; gap: 0.6rem;">
+
+  <div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 1rem; flex-wrap: wrap;">
+    <div style="display: flex; flex-direction: column; gap: 0.15rem;">
+      <div class="mono t-xs muted caps">Admin Console</div>
+      <h1 class="t-xl semibold" style="margin: 0;">Facility Overview</h1>
+    </div>
+    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+      <a href="/journal" class="action action-secondary">Full Journal</a>
+      <a href="/equipment" class="action action-primary">Manage Equipment</a>
+    </div>
+  </div>
+
+  <div class="grid grid-4" style="gap: 0.6rem;">
+    <div class="stat-tile">
+      <div class="mono t-xs muted caps">Total Stations</div>
+      <div class="t-xl mono semibold">{{ summary.total }}</div>
+      <div class="meter mt-1"><div class="meter-fill primary" style="width: 100%;"></div></div>
+    </div>
+    <div class="stat-tile">
+      <div class="mono t-xs muted caps">Running</div>
+      <div class="t-xl mono accent-primary semibold">{{ summary.by_state.running }}</div>
+      <div class="t-xs muted">Cycles active</div>
+    </div>
+    <div class="stat-tile">
+      <div class="mono t-xs muted caps">Available</div>
+      <div class="t-xl mono accent-tertiary semibold">{{ summary.by_state.available }}</div>
+      <div class="t-xs muted">Ready to use</div>
+    </div>
+    <div class="stat-tile">
+      <div class="mono t-xs muted caps">Sealed Doors</div>
+      <div class="t-xl mono semibold">{{ summary.sealed }}/{{ summary.total }}</div>
+      <div class="t-xs muted">Solenoids latched</div>
+    </div>
+  </div>
+
+  <div class="overview-split">
+
+    <div class="panel overview-panel">
+      <div class="overview-panel-header">
+        <h2 class="t-lg semibold">Live Stations</h2>
+        <span class="mono t-xs muted">Click to manage</span>
+      </div>
+      <div class="overview-panel-body">
+        <div class="grid grid-4" style="gap: 0.6rem;">
+          {% for unit in units %}
+          <div class="panel panel-low station-mini" onclick="location.href='/equipment'" style="cursor: pointer;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+              <span class="mono semibold accent-primary">Bay #{{ '%02d'|format(unit.station_number) }}</span>
+              <span class="chip {% if unit.state.value == 'running' %}chip-primary{% elif unit.state.value == 'available' %}chip-tertiary{% elif unit.state.value == 'finished' %}chip-tertiary{% else %}chip-muted{% endif %}" style="font-size: 9px; padding: 0.1rem 0.4rem;">{{ unit.state.value }}</span>
+            </div>
+            <div class="mono t-lg semibold" style="margin-bottom: 0.4rem;">{{ '%.2f'|format(unit.load_kg) }}<span class="t-xs muted">kg</span></div>
+            <div class="meter" style="margin-bottom: 0.4rem;"><div class="meter-fill primary" style="width: {{ (unit.load_kg / unit.capacity_kg * 100) if unit.capacity_kg else 0 }}%;"></div></div>
+            <div style="display: flex; justify-content: space-between;" class="mono t-xs muted">
+              <span>{{ format_temperature(unit.temperature_celsius) }}</span>
+              <span>{% if unit.is_sealed %}Locked{% else %}Open{% endif %}</span>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="panel overview-panel">
+      <div class="overview-panel-header">
+        <h2 class="t-lg semibold">Recent Activity</h2>
+        <a href="/journal" class="mono t-xs accent-primary">View all →</a>
+      </div>
+      <div class="overview-panel-body">
+        <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+          {% for entry in entries %}
+          <div class="panel panel-low" style="padding: 0.6rem 0.75rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.3rem;">
+              <span class="mono t-xs muted">{{ entry.occurred_at.strftime('%H:%M:%S') }}</span>
+              <span class="chip {% if entry.outcome.value in ['completed', 'calibrated', 'sealed'] %}chip-tertiary{% else %}chip-primary{% endif %}" style="font-size: 9px; padding: 0.1rem 0.4rem;">{{ entry.outcome.value }}</span>
+            </div>
+            <div class="mono t-xs accent-primary" style="margin-bottom: 0.15rem;">{{ entry.station_label }}</div>
+            <div class="t-xs muted" style="line-height: 1.35;">{{ entry.description }}</div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+{% endblock %}

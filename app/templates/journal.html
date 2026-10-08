@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% set active = 'journal' %}
+{% block title %}Journal â€” {{ facility_name }}{% endblock %}
+{% block content %}
+
+<div style="display: flex; flex-direction: column; gap: 0.6rem;">
+
+  <div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 1rem; flex-wrap: wrap;">
+    <div style="display: flex; flex-direction: column; gap: 0.15rem;">
+      <div class="mono t-xs muted caps">Admin Console</div>
+      <h1 class="t-xl semibold" style="margin: 0;">Operations Journal</h1>
+    </div>
+    <div style="display: flex; gap: 0.5rem;">
+      <a href="/overview" class="action action-secondary">Back to Overview</a>
+      <button class="action action-primary" onclick="exportCsv()">Export CSV</button>
+    </div>
+  </div>
+
+  <form method="get" class="panel" style="padding: 0.75rem; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+    <a href="/journal" class="action {% if not active_category %}action-primary{% else %}action-secondary{% endif %}" style="font-size: 10px; padding: 0.4rem 0.75rem;">All</a>
+    <a href="/journal?category=settlement" class="action {% if active_category == 'settlement' %}action-primary{% else %}action-secondary{% endif %}" style="font-size: 10px; padding: 0.4rem 0.75rem;">Settlement</a>
+    <a href="/journal?category=access" class="action {% if active_category == 'access' %}action-primary{% else %}action-secondary{% endif %}" style="font-size: 10px; padding: 0.4rem 0.75rem;">Access</a>
+    <a href="/journal?category=measurement" class="action {% if active_category == 'measurement' %}action-primary{% else %}action-secondary{% endif %}" style="font-size: 10px; padding: 0.4rem 0.75rem;">Measurement</a>
+    <a href="/journal?category=administration" class="action {% if active_category == 'administration' %}action-primary{% else %}action-secondary{% endif %}" style="font-size: 10px; padding: 0.4rem 0.75rem;">Admin</a>
+    <input name="q" value="{{ search_term }}" placeholder="Search description, station, or reference..." class="field mono" style="flex: 1; min-width: 12rem;">
+    <button class="action action-primary" type="submit" style="font-size: 10px; padding: 0.4rem 0.9rem;">Search</button>
+  </form>
+
+  <div class="panel overview-panel">
+    <div class="overview-panel-header">
+      <h2 class="t-lg semibold">Journal Entries</h2>
+      <span class="mono t-xs muted">{{ entries|length }} entries</span>
+    </div>
+    <div class="overview-panel-body">
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 90px;">Time</th>
+            <th style="width: 130px;">Category</th>
+            <th style="width: 100px;">Station</th>
+            <th>Description</th>
+            <th style="width: 130px;">User</th>
+            <th style="width: 110px;">Outcome</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for entry in entries %}
+          <tr>
+            <td class="mono t-xs">{{ entry.occurred_at.strftime('%H:%M:%S') }}</td>
+            <td><span class="chip chip-muted" style="font-size: 9px;">{{ entry.category.value }}</span></td>
+            <td class="mono accent-primary">{{ entry.station_label }}</td>
+            <td class="t-sm">{{ entry.description }}</td>
+            <td class="t-xs muted">{{ entry.actor_label }}</td>
+            <td><span class="chip {% if entry.outcome.value in ['completed', 'calibrated', 'sealed'] %}chip-tertiary{% else %}chip-primary{% endif %}" style="font-size: 9px;">{{ entry.outcome.value }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  async function exportCsv() {
+    const response = await fetch("/api/journal/export");
+    const data = await response.json();
+    const blob = new Blob([data.csv], {type: "text/csv"});
+    const anchor = document.createElement("a");
+    anchor.href = URL.createObjectURL(blob);
+    anchor.download = "journal_export.csv";
+    anchor.click();
+  }
+</script>
+{% endblock %}

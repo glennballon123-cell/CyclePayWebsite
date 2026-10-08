@@ -1,0 +1,37 @@
+{% if account and account.role.value == 'admin' %}
+  {% extends "base.html" %}
+  {% set active = 'policy' %}
+{% else %}
+  {% extends "public_base.html" %}
+  {% set active = 'policy' %}
+{% endif %}
+
+{% block title %}Policy — {{ facility_name }}{% endblock %}
+{% block content %}
+
+<div style="max-width: 1100px; margin: 0 auto;">
+
+  <div class="panel panel-low mb-4">
+    <span class="chip chip-primary mb-2">Data Handling Policy</span>
+    <h1 class="t-2xl semibold mb-2">Privacy &amp; Data Protection</h1>
+    <p class="t-sm accent-primary mono mb-2">{{ facility_name }} • {{ facility_location }}</p>
+    <p class="t-md muted">How we collect, use, and protect your data.</p>
+  </div>
+
+  {% for title, items in [
+    ('1. Information We Collect', ['Contact number', 'Settlement transactions', 'Equipment telemetry', 'No payment card data']),
+    ('2. How We Use Your Data', ['Pre-completion notifications', 'Access authorization', 'Equipment calibration', 'Lost-item reconciliation']),
+    ('3. Protection &amp; Sharing', ['Local encrypted storage', 'No third-party advertising', 'No cross-tenant sharing']),
+    ('4. Your Rights', ['Access and correct your records', 'Request removal of historical data', 'Contact: ' + facility_support_email])
+  ] %}
+  <div class="panel mb-3">
+    <h2 class="t-lg semibold accent-primary mb-2">{{ title }}</h2>
+    <ul class="t-md muted" style="margin: 0; padding-left: 1.2rem;">
+      {% for item in items %}<li>{{ item }}</li>{% endfor %}
+    </ul>
+  </div>
+  {% endfor %}
+
+</div>
+
+{% endblock %}

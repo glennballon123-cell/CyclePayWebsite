@@ -1,0 +1,56 @@
+{% if account and account.role.value == 'admin' %}
+  {% extends "base.html" %}
+  {% set active = 'guide' %}
+{% else %}
+  {% extends "public_base.html" %}
+  {% set active = 'guide' %}
+{% endif %}
+
+{% block title %}Guide — {{ facility_name }}{% endblock %}
+{% block content %}
+
+<div style="max-width: 1100px; margin: 0 auto;">
+
+  <div class="panel panel-low mb-4">
+    <span class="chip chip-tertiary mb-2">Operations Guide</span>
+    <h1 class="t-2xl semibold mb-2">How to Use the Platform</h1>
+    <p class="t-md muted">Every cycle follows the same six checkpoints.</p>
+  </div>
+
+  <div class="grid grid-3 mb-4">
+    {% for n, title, desc in [
+      ('01', 'Load & Measure', 'Place dry items at the station. The load cell records the weight.'),
+      ('02', 'Voucher Issuance', 'The admin issues a signed QR voucher for the measured load.'),
+      ('03', 'Present Voucher', 'Present the voucher at the assigned station for verification.'),
+      ('04', 'Balance Deduction', 'Scanning the voucher deducts the price from your balance.'),
+      ('05', 'Cycle Activation', 'The machine begins the selected program automatically.'),
+      ('06', 'Secure Release', 'The door unlocks when the cycle completes.')
+    ] %}
+    <div class="panel">
+      <div class="t-display mono accent-primary semibold">{{ n }}</div>
+      <h3 class="t-lg semibold mt-2 mb-1">{{ title }}</h3>
+      <p class="t-sm muted">{{ desc }}</p>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="panel">
+    <h2 class="t-lg semibold mb-3">Rate Card</h2>
+    <table>
+      <thead><tr><th>Program</th><th>Duration</th><th>Temperature</th><th>Rate</th></tr></thead>
+      <tbody>
+        {% for key, program in cycle_programs.items() %}
+        <tr>
+          <td>{{ program.label }}</td>
+          <td class="mono">{{ program.cycle_minutes }} min</td>
+          <td class="mono">{{ program.temperature_celsius }}°C</td>
+          <td class="mono accent-primary semibold">{{ format_currency(hardware_price_per_kg) }} / kg</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+{% endblock %}

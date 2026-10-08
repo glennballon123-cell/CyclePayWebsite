@@ -1,0 +1,304 @@
+{% extends "public_base.html" %}
+{% set hide_nav = true %}
+{% block title %}Login — {{ facility_name }}{% endblock %}
+{% block content %}
+
+<div style="min-height: calc(100vh - 8rem); display: flex; align-items: center; justify-content: center; padding: 2rem 1rem;">
+
+  <div style="width: 100%; max-width: 460px;">
+
+    <div style="text-align: center; margin-bottom: 2rem;">
+      <span class="mono t-xs accent-primary caps semibold">Secure Access</span>
+      <h1 class="t-2xl semibold" style="margin-top: 0.5rem;">Welcome</h1>
+      <p class="t-sm muted" style="margin-top: 0.5rem;">Choose a role to continue.</p>
+    </div>
+
+    <div class="panel" style="padding: 2rem;">
+
+      <div class="grid grid-2 gap-2 mb-4" style="padding: 0.25rem; background: var(--surface-lowest); border-radius: 0.5rem;">
+        <button type="button" id="tabClient" onclick="selectRole('client')" class="action action-primary" style="justify-content: center; padding: 0.75rem;">Client</button>
+        <button type="button" id="tabAdmin" onclick="selectRole('admin')" class="action action-secondary" style="justify-content: center; padding: 0.75rem;">Admin</button>
+      </div>
+
+      <form id="signInForm" class="flex col gap-3">
+        <div class="flex col gap-1">
+          <label class="mono t-xs muted caps">Contact Number</label>
+          <input name="contact" id="contactInput" class="field mono" placeholder="Enter your registered contact number" required autocomplete="tel">
+        </div>
+        <div class="flex col gap-1">
+          <label class="mono t-xs muted caps">Credential / PIN</label>
+          <input name="credential" id="credentialInput" type="password" class="field mono" placeholder="Enter your PIN or password" required autocomplete="current-password">
+        </div>
+        <button type="submit" id="submitBtn" class="action action-primary w-full" style="justify-content: center; padding: 0.85rem; margin-top: 0.5rem;">
+          <span id="submitLabel">Login as Client</span>
+        </button>
+      </form>
+
+      <div id="clientRegisterToggle" style="margin-top: 1rem;">
+        <button type="button" onclick="toggleRegister()" id="registerToggleBtn" class="action action-secondary w-full" style="justify-content: center; padding: 0.75rem;">
+          <span id="registerToggleLabel">Create Account</span>
+        </button>
+      </div>
+
+      <form id="createForm" class="flex col gap-3" style="display: none; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--outline-variant);" novalidate>
+
+        <div class="flex col gap-1">
+          <label class="mono t-xs muted caps">Display Name</label>
+          <input name="display_name" id="createName" class="field" placeholder="Type your full name" autocomplete="name">
+          <div class="t-xs muted" id="hintName">At least 2 characters. Letters and spaces.</div>
+        </div>
+
+        <div class="flex col gap-1">
+          <label class="mono t-xs muted caps">Contact Number</label>
+          <input name="contact" id="createContact" class="field mono" placeholder="Type your mobile number (e.g. 09XX XXX XXXX)" autocomplete="tel">
+          <div class="t-xs muted" id="hintContact">Philippine format. +63 or 09 prefix. 10–13 digits.</div>
+        </div>
+
+        <div class="flex col gap-1">
+          <label class="mono t-xs muted caps">Credential / PIN</label>
+          <input name="credential" id="createCredential" type="password" class="field mono" placeholder="Choose a PIN or password" autocomplete="new-password">
+          <div class="t-xs muted" id="hintCredential">At least 4 characters. Numbers or letters.</div>
+        </div>
+
+        <div class="flex col gap-1">
+          <label class="mono t-xs muted caps">Confirm PIN</label>
+          <input name="confirm" id="createConfirm" type="password" class="field mono" placeholder="Type the same PIN again" autocomplete="new-password">
+          <div class="t-xs muted" id="hintConfirm">Must match the PIN above.</div>
+        </div>
+
+        <button type="submit" id="createBtn" class="action action-primary w-full" style="justify-content: center; padding: 0.85rem; margin-top: 0.5rem;">
+          Create My Account
+        </button>
+
+      </form>
+
+      <div id="loginError" class="panel mt-3" style="display: none; padding: 0.75rem 1rem; border-color: var(--accent-error);">
+        <div class="mono t-xs accent-error caps semibold" id="errorTitle" style="margin-bottom: 0.25rem;">Login Failed</div>
+        <div id="loginErrorText" class="t-sm muted"></div>
+        <ul id="loginErrorList" class="t-xs muted" style="margin: 0.5rem 0 0 1rem; padding: 0;"></ul>
+      </div>
+
+      <div id="loginSuccess" class="panel mt-3" style="display: none; padding: 0.75rem 1rem; border-color: var(--accent-tertiary);">
+        <div class="mono t-xs accent-tertiary caps semibold" style="margin-bottom: 0.25rem;">Account Created</div>
+        <div id="loginSuccessText" class="t-sm muted"></div>
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  window.__suppressToast = true;
+  let selectedRole = "client";
+  let registerOpen = false;
+
+  function selectRole(role) {
+    selectedRole = role;
+    const tabClient = document.getElementById("tabClient");
+    const tabAdmin = document.getElementById("tabAdmin");
+    const contactInput = document.getElementById("contactInput");
+    const submitLabel = document.getElementById("submitLabel");
+    const submitBtn = document.getElementById("submitBtn");
+    const registerToggle = document.getElementById("clientRegisterToggle");
+
+    if (role === "client") {
+      tabClient.className = "action action-primary";
+      tabAdmin.className = "action action-secondary";
+      contactInput.placeholder = "Enter your registered contact number";
+      submitLabel.textContent = "Login as Client";
+      submitBtn.className = "action action-primary w-full";
+      registerToggle.style.display = "block";
+    } else {
+      tabAdmin.className = "action action-primary";
+      tabClient.className = "action action-secondary";
+      contactInput.placeholder = "Enter the admin contact number";
+      submitLabel.textContent = "Login as Admin";
+      submitBtn.className = "action action-tertiary w-full";
+      registerToggle.style.display = "none";
+      closeRegister();
+    }
+    hideMessages();
+  }
+
+  function toggleRegister() {
+    if (registerOpen) {
+      closeRegister();
+    } else {
+      document.getElementById("createForm").style.display = "flex";
+      document.getElementById("registerToggleLabel").textContent = "Cancel";
+      registerOpen = true;
+      hideMessages();
+    }
+  }
+
+  function closeRegister() {
+    document.getElementById("createForm").style.display = "none";
+    document.getElementById("registerToggleLabel").textContent = "Create Account";
+    registerOpen = false;
+  }
+
+  function hideMessages() {
+    document.getElementById("loginError").style.display = "none";
+    document.getElementById("loginSuccess").style.display = "none";
+    document.getElementById("loginErrorList").innerHTML = "";
+  }
+
+  function showError(title, message, items) {
+    document.getElementById("errorTitle").textContent = title;
+    document.getElementById("loginErrorText").textContent = message;
+    const list = document.getElementById("loginErrorList");
+    list.innerHTML = "";
+    if (items && items.length) {
+      items.forEach((item) => {
+        const li = document.createElement("li");
+        li.textContent = item;
+        list.appendChild(li);
+      });
+    }
+    document.getElementById("loginError").style.display = "block";
+    document.getElementById("loginSuccess").style.display = "none";
+  }
+
+  function showSuccess(message) {
+    document.getElementById("loginSuccessText").textContent = message;
+    document.getElementById("loginSuccess").style.display = "block";
+    document.getElementById("loginError").style.display = "none";
+  }
+
+  function setFieldHint(fieldId, hintId, valid, message) {
+    const field = document.getElementById(fieldId);
+    const hint = document.getElementById(hintId);
+    if (valid === null) {
+      field.style.borderColor = "";
+      hint.className = "t-xs muted";
+      hint.textContent = message;
+      return;
+    }
+    if (valid) {
+      field.style.borderColor = "var(--accent-tertiary)";
+      hint.className = "t-xs accent-tertiary";
+      hint.textContent = "✓ " + message;
+    } else {
+      field.style.borderColor = "var(--accent-error)";
+      hint.className = "t-xs accent-error";
+      hint.textContent = "✗ " + message;
+    }
+  }
+
+  function validateName() {
+    const value = document.getElementById("createName").value.trim();
+    if (value.length === 0) { setFieldHint("createName", "hintName", null, "At least 2 characters. Letters and spaces."); return false; }
+    if (value.length < 2) { setFieldHint("createName", "hintName", false, "Name must be at least 2 characters."); return false; }
+    setFieldHint("createName", "hintName", true, "Name looks good.");
+    return true;
+  }
+
+  function validateContact() {
+    const raw = document.getElementById("createContact").value.trim();
+    if (raw.length === 0) { setFieldHint("createContact", "hintContact", null, "Philippine format. +63 or 09 prefix. 10–13 digits."); return false; }
+    const digits = raw.replace(/\D/g, "");
+    if (digits.length < 10 || digits.length > 13) { setFieldHint("createContact", "hintContact", false, "Needs 10–13 digits. Got " + digits.length + "."); return false; }
+    if (!raw.startsWith("+") && !raw.startsWith("0") && !raw.startsWith("9")) { setFieldHint("createContact", "hintContact", false, "Start with +63, 09, or 9."); return false; }
+    setFieldHint("createContact", "hintContact", true, "Contact format is valid.");
+    return true;
+  }
+
+  function validateCredential() {
+    const value = document.getElementById("createCredential").value;
+    if (value.length === 0) { setFieldHint("createCredential", "hintCredential", null, "At least 4 characters. Numbers or letters."); return false; }
+    if (value.length < 4) { setFieldHint("createCredential", "hintCredential", false, "PIN must be at least 4 characters. Got " + value.length + "."); return false; }
+    setFieldHint("createCredential", "hintCredential", true, "PIN is strong enough.");
+    return true;
+  }
+
+  function validateConfirm() {
+    const pin = document.getElementById("createCredential").value;
+    const confirm = document.getElementById("createConfirm").value;
+    if (confirm.length === 0) { setFieldHint("createConfirm", "hintConfirm", null, "Must match the PIN above."); return false; }
+    if (pin !== confirm) { setFieldHint("createConfirm", "hintConfirm", false, "PINs do not match."); return false; }
+    setFieldHint("createConfirm", "hintConfirm", true, "PINs match.");
+    return true;
+  }
+
+  document.getElementById("createName").addEventListener("input", validateName);
+  document.getElementById("createContact").addEventListener("input", validateContact);
+  document.getElementById("createCredential").addEventListener("input", () => {
+    validateCredential();
+    if (document.getElementById("createConfirm").value) validateConfirm();
+  });
+  document.getElementById("createConfirm").addEventListener("input", validateConfirm);
+
+  document.getElementById("signInForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    hideMessages();
+    const contact = document.getElementById("contactInput").value.trim();
+    const credential = document.getElementById("credentialInput").value;
+    if (!contact || !credential) { showError("Login Failed", "Please fill in both fields."); return; }
+    const params = new URLSearchParams({contact, credential, role: selectedRole});
+    const response = await fetch(`/api/accounts/authenticate?${params}`, {method: "POST"});
+    if (response.ok) {
+      const data = await response.json();
+      setTimeout(() => {
+        window.location.href = data.account.role === "admin" ? "/overview" : "/kiosk";
+      }, 400);
+    } else {
+      showError("Login Failed", "Please check your credentials and try again.");
+    }
+  });
+
+  document.getElementById("createForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    hideMessages();
+
+    const problems = [];
+    if (!validateName()) problems.push("Display Name: at least 2 characters.");
+    if (!validateContact()) problems.push("Contact Number: 10–13 digits starting with +63, 09, or 9.");
+    if (!validateCredential()) problems.push("PIN: at least 4 characters.");
+    if (!validateConfirm()) problems.push("Confirm PIN: must match the PIN.");
+
+    if (problems.length > 0) {
+      showError("Fix These Fields", "Correct the following before continuing:", problems);
+      return;
+    }
+
+    const displayName = document.getElementById("createName").value.trim();
+    let contact = document.getElementById("createContact").value.trim();
+    const credential = document.getElementById("createCredential").value;
+
+    if (!contact.startsWith("+")) contact = "+63" + contact.replace(/^0/, "");
+
+    const response = await fetch("/api/accounts/", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        display_name: displayName,
+        contact_number: contact,
+        credential: credential,
+        role: "client",
+        initial_balance: 0.0,
+      }),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      showSuccess("Account created for " + data.display_name + ". You can now log in.");
+      document.getElementById("contactInput").value = contact;
+      document.getElementById("credentialInput").value = "";
+      closeRegister();
+    } else {
+      let detail = "Registration failed.";
+      try {
+        const err = await response.json();
+        if (typeof err.detail === "string") detail = err.detail;
+        else if (Array.isArray(err.detail)) detail = err.detail.map(e => e.msg).join(", ");
+      } catch (_) {}
+      showError("Registration Failed", detail);
+    }
+  });
+</script>
+{% endblock %}

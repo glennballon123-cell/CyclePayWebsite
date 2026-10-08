@@ -1,0 +1,421 @@
+{% extends "public_base.html" %}
+{% set active = 'progress' %}
+{% block title %}Live Progress — {{ facility_name }}{% endblock %}
+{% block content %}
+
+<div style="max-width: 1400px; margin: 0 auto;">
+
+  {% if unit %}
+
+  <div style="margin-bottom: 1.25rem;">
+    <div class="mono t-xs muted caps" style="margin-bottom: 0.25rem;">Real-Time Telemetry</div>
+    <h1 class="t-2xl semibold">{{ format_bay_label(unit.station_number) }} — {{ format_state_label(unit.state.value) }}</h1>
+    <p class="t-md muted" style="margin-top: 0.5rem;">
+      {% if unit.state.value == 'running' %}
+        Cycle in progress. The door is sealed until the timer reaches zero.
+      {% elif unit.state.value == 'finished' %}
+        Cycle complete. You can unlock the door now.
+      {% elif unit.state.value == 'available' %}
+        Station is idle and ready for a new cycle.
+      {% else %}
+        Station is currently {{ unit.state.value }}.
+      {% endif %}
+    </p>
+  </div>
+
+  <div class="grid grid-4" style="margin-bottom: 1.25rem;">
+    <div class="stat-tile">
+      <div class="mono t-xs muted caps">Station</div>
+      <div class="t-2xl mono accent-primary semibold">{{ format_bay_label(unit.station_number) }}</div>
+      <div class="mono t-xs muted">Firmware {{ unit.firmware_label or '—' }}</div>
+    </div>
+    <div class="stat-tile">
+      <div class="mono t-xs muted caps">Remaining</div>
+      <div class="t-2xl mono semibold" id="remainingTimer">{{ format_duration(unit.minutes_remaining) }}</div>
+      <div class="mono t-xs muted" id="timerStatus">
+        {% if unit.state.value == 'running' %}Live countdown{% else %}Not running{% endif %}
+      </div>
+    </div>
+    <div class="stat-tile">
+      <div class="mono t-xs muted caps">Temperature</div>
+      <div class="t-2xl mono accent-primary semibold">{{ format_temperature(unit.temperature_celsius) }}</div>
+      <div class="mono t-xs muted">Sensor reading</div>
+    </div>
+    <div class="stat-tile">
+      <div class="mono t-xs muted caps">Rotation</div>
+      <div class="t-2xl mono accent-secondary semibold">{{ format_rotation(unit.rotation_rpm) }}</div>
+      <div class="mono t-xs muted">Drum speed</div>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-bottom: 1.25rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+      <span class="mono t-xs muted caps">Wash Progress</span>
+      <span id="progressLabel" class="chip chip-primary">Running</span>
+    </div>
+
+    <div class="grid" style="grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.75rem;">
+      <div class="panel panel-high" data-stage="loaded">
+        <div class="mono t-xs caps bold" style="margin-bottom: 0.25rem;" data-label="loaded">Step 01</div>
+        <div class="t-sm" data-value="loaded">Load</div>
+      </div>
+      <div class="panel panel-high" data-stage="settled">
+        <div class="mono t-xs caps bold" style="margin-bottom: 0.25rem;" data-label="settled">Step 02</div>
+        <div class="t-sm" data-value="settled">Settled</div>
+      </div>
+      <div class="panel panel-high" data-stage="washing">
+        <div class="mono t-xs caps bold" style="margin-bottom: 0.25rem;" data-label="washing">Step 03</div>
+        <div class="t-sm" data-value="washing">Washing</div>
+      </div>
+      <div class="panel panel-high" data-stage="rinsing">
+        <div class="mono t-xs caps bold" style="margin-bottom: 0.25rem;" data-label="rinsing">Step 04</div>
+        <div class="t-sm" data-value="rinsing">Rinsing</div>
+      </div>
+      <div class="panel panel-high" data-stage="release">
+        <div class="mono t-xs caps bold" style="margin-bottom: 0.25rem;" data-label="release">Step 05</div>
+        <div class="t-sm" data-value="release">Release</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-bottom: 1.25rem;">
+    <h2 class="t-xl semibold" style="margin-bottom: 1rem;">Cycle Controls</h2>
+    <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+      <button onclick="requestHelp()" class="action action-secondary">Request Help</button>
+
+      {% if unit.state.value == 'running' %}
+        <button id="pauseBtn" onclick="togglePause()" class="action action-primary">
+          <span id="pauseBtnIcon">⏸</span>
+          <span id="pauseBtnText">Pause Cycle</span>
+        </button>
+        <button onclick="confirmEmergencyStop()" class="action action-danger" style="background: rgba(255, 180, 171, 0.15); border-color: var(--accent-error); color: var(--accent-error);">
+          <span>⏹</span>
+          <span>Emergency Stop</span>
+        </button>
+      {% elif unit.state.value == 'finished' %}
+        <button onclick="unlockDoor({{ unit.id }})" class="action action-tertiary">Unlock Door</button>
+      {% else %}
+        <a href="/kiosk" class="action action-primary">Start a New Cycle</a>
+      {% endif %}
+    </div>
+    <div id="controlStatus" class="mono t-xs muted" style="margin-top: 0.75rem;"></div>
+  </div>
+
+  {% if latest_session %}
+  <div class="panel">
+    <h2 class="t-xl semibold" style="margin-bottom: 1rem;">Session Details</h2>
+    <table>
+      <thead><tr><th>Started</th><th>Station</th><th>Load</th><th>Cycle</th><th>Amount Paid</th><th>Method</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="mono t-xs">{{ latest_session.started_at.strftime('%b %d, %Y %I:%M %p') }}</td>
+          <td class="mono accent-primary">{{ format_bay_label(latest_session.station_number) }}</td>
+          <td class="mono">{{ format_load(latest_session.load_kg) }}</td>
+          <td>{{ latest_session.cycle_label }}</td>
+          <td class="mono accent-tertiary bold">{{ format_currency(latest_session.amount_paid) }}</td>
+          <td><span class="chip chip-muted" style="font-size: 9px;">{{ latest_session.method.value }}</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  {% else %}
+
+  <div class="panel" style="padding: 3rem; text-align: center;">
+    <div class="t-2xl muted" style="margin-bottom: 1rem;">&#9676;</div>
+    <p class="t-md muted">No active session at this station.</p>
+    <a href="/kiosk" class="action action-primary" style="display: inline-flex; margin-top: 1rem;">Start a New Wash →</a>
+  </div>
+
+  {% endif %}
+
+</div>
+
+<div id="emergencyModal" class="modal-backdrop" hidden>
+  <div class="modal-window" style="max-width: 24rem; text-align: center;">
+    <div style="width: 3rem; height: 3rem; border-radius: 50%; background: rgba(255, 180, 171, 0.15); border: 1px solid rgba(255, 180, 171, 0.4); color: var(--accent-error); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: 700; margin: 0 auto 1rem;">!</div>
+    <div class="modal-title" style="text-align: center;">Emergency Stop</div>
+    <div class="modal-message" style="text-align: center; margin-bottom: 1rem;">
+      This will immediately halt the cycle, drain the drum, and release the door. The cycle cannot be resumed.
+    </div>
+    <div style="display: flex; gap: 0.5rem; padding-top: 1rem; border-top: 1px solid var(--outline-variant);">
+      <button class="action action-secondary" style="flex: 1; justify-content: center;" onclick="closeEmergencyModal()">Cancel</button>
+      <button class="action action-danger" style="flex: 1; justify-content: center; background: rgba(255, 180, 171, 0.2); border-color: var(--accent-error); color: var(--accent-error); font-weight: 700;" onclick="executeEmergencyStop()">Stop Now</button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+{% if unit %}
+<script>
+  const currentState = "{{ unit.state.value }}";
+  const currentStationId = {{ unit.id }};
+  const startingMinutes = {{ unit.minutes_remaining }};
+
+  let secondsLeft = startingMinutes * 60;
+  let isPaused = false;
+  let tickHandle = null;
+
+  function updatePipelineStages() {
+    const stages = {
+      loaded: { done: true, active: false },
+      settled: { done: true, active: false },
+      washing: { done: false, active: false },
+      rinsing: { done: false, active: false },
+      release: { done: false, active: false },
+    };
+
+    if (currentState === "available") {
+      Object.keys(stages).forEach(k => { stages[k].done = false; stages[k].active = false; });
+    } else if (currentState === "running") {
+      stages.loaded.done = true;
+      stages.settled.done = true;
+      stages.washing.active = true;
+    } else if (currentState === "extracting") {
+      stages.loaded.done = true;
+      stages.settled.done = true;
+      stages.washing.done = true;
+      stages.rinsing.active = true;
+    } else if (currentState === "finished") {
+      Object.keys(stages).forEach(k => { stages[k].done = true; });
+    }
+
+    document.querySelectorAll("[data-stage]").forEach(card => {
+      const stage = card.dataset.stage;
+      const label = card.querySelector("[data-label]");
+      const value = card.querySelector("[data-value]");
+      card.style.borderColor = "";
+      label.className = "mono t-xs caps bold";
+      value.className = "t-sm";
+
+      if (stages[stage].done) {
+        card.style.borderColor = "var(--accent-tertiary)";
+        label.className = "mono t-xs caps bold accent-tertiary";
+        if (stage === "loaded") value.textContent = "Weighed";
+        if (stage === "settled") value.textContent = "Confirmed";
+        if (stage === "washing") value.textContent = "Complete";
+        if (stage === "rinsing") value.textContent = "Complete";
+        if (stage === "release") value.textContent = "Released";
+      } else if (stages[stage].active) {
+        card.style.borderColor = "var(--accent-primary)";
+        label.className = "mono t-xs caps bold accent-primary";
+        value.className = "t-sm accent-primary";
+      } else {
+        label.className = "mono t-xs caps bold muted";
+        value.className = "t-sm muted";
+      }
+    });
+  }
+
+  function renderTimer() {
+    const timer = document.getElementById("remainingTimer");
+    if (!timer) return;
+    if (secondsLeft <= 0) {
+      timer.textContent = "Done";
+      return;
+    }
+    const m = Math.floor(secondsLeft / 60);
+    const s = secondsLeft % 60;
+    timer.textContent = String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0");
+  }
+
+     function startCountdown() {
+    const timer = document.getElementById("remainingTimer");
+    if (!timer) return;
+
+    if (currentState !== "running") {
+      if (currentState === "finished") timer.textContent = "Done";
+      else timer.textContent = "--:--";
+      return;
+    }
+
+    const serverStarted = "{{ session_started_iso }}";
+    const currentStation = "{{ unit.station_number }}";
+    const STORAGE_KEY = "spinflow_active_station";
+    const START_KEY = "spinflow_start_time";
+    const MIN_KEY = "spinflow_active_minutes";
+
+    const storedStation = localStorage.getItem(STORAGE_KEY);
+    const storedStart = localStorage.getItem(START_KEY);
+    const storedMinutes = parseInt(localStorage.getItem(MIN_KEY) || "0");
+
+    let startTimestamp = null;
+    let totalMinutes = startingMinutes;
+
+    if (storedStation === currentStation && storedStart && storedMinutes > 0) {
+      startTimestamp = parseInt(storedStart);
+      totalMinutes = storedMinutes;
+    } else if (serverStarted) {
+      startTimestamp = new Date(serverStarted).getTime();
+      totalMinutes = startingMinutes;
+      localStorage.setItem(STORAGE_KEY, currentStation);
+      localStorage.setItem(MIN_KEY, String(totalMinutes));
+      localStorage.setItem(START_KEY, String(startTimestamp));
+    } else {
+      secondsLeft = startingMinutes * 60;
+      renderTimer();
+      return;
+    }
+
+    const elapsed = Math.floor((Date.now() - startTimestamp) / 1000);
+    secondsLeft = Math.max(totalMinutes * 60 - elapsed, 0);
+    renderTimer();
+
+    if (tickHandle) clearInterval(tickHandle);
+    tickHandle = setInterval(() => {
+      if (isPaused) return;
+      if (secondsLeft <= 0) {
+        clearInterval(tickHandle);
+        renderTimer();
+        markCycleComplete();
+        return;
+      }
+      secondsLeft--;
+      renderTimer();
+    }, 1000);
+  }
+
+  function togglePause() {
+    isPaused = !isPaused;
+    const btnText = document.getElementById("pauseBtnText");
+    const btnIcon = document.getElementById("pauseBtnIcon");
+    const status = document.getElementById("controlStatus");
+    const timerStatus = document.getElementById("timerStatus");
+    const chip = document.getElementById("progressLabel");
+
+    if (isPaused) {
+      btnText.textContent = "Resume Cycle";
+      btnIcon.textContent = "▶";
+      status.textContent = "Cycle paused. The timer is frozen. Press Resume to continue.";
+      timerStatus.textContent = "Paused";
+      chip.textContent = "Paused";
+      chip.className = "chip chip-muted";
+    } else {
+      btnText.textContent = "Pause Cycle";
+      btnIcon.textContent = "⏸";
+      status.textContent = "Cycle resumed.";
+      timerStatus.textContent = "Live countdown";
+      chip.textContent = "Running";
+      chip.className = "chip chip-primary";
+    }
+  }
+
+  function confirmEmergencyStop() {
+    document.getElementById("emergencyModal").hidden = false;
+  }
+
+  function closeEmergencyModal() {
+    document.getElementById("emergencyModal").hidden = true;
+  }
+
+  async function executeEmergencyStop() {
+    closeEmergencyModal();
+
+    const response = await fetch(`/api/equipment/${currentStationId}`, {
+      method: "PATCH",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        state: "available",
+        minutes_remaining: 0,
+        is_sealed: false,
+        is_door_closed: false,
+        active_instrument_code: null,
+        temperature_celsius: null,
+        rotation_rpm: null,
+        load_kg: 0
+      })
+    });
+
+    if (response.ok) {
+      isPaused = true;
+      if (tickHandle) clearInterval(tickHandle);
+      secondsLeft = 0;
+      renderTimer();
+      document.getElementById("controlStatus").textContent = "Emergency stop executed. Station reset to idle.";
+      document.getElementById("progressLabel").textContent = "Stopped";
+      document.getElementById("progressLabel").className = "chip chip-error";
+      localStorage.removeItem("spinflow_active_station");
+      localStorage.removeItem("spinflow_start_time");
+      localStorage.removeItem("spinflow_active_minutes");
+      setTimeout(() => location.reload(), 1500);
+    } else {
+      document.getElementById("controlStatus").textContent = "Failed to stop cycle. Try again.";
+    }
+  }
+
+  async function requestHelp() {
+    notify("Help Requested", "An attendant has been notified.");
+    try {
+      await fetch("/api/journal/", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          category: "administration",
+          station_label: "{{ format_bay_label(unit.station_number) }}",
+          description: "Attendant help requested from client console",
+          actor_label: "{{ account.display_name if account else 'Guest' }}",
+          outcome: "confirmed",
+          reference_code: "HLP-" + Date.now(),
+        })
+      });
+    } catch (err) {}
+  }
+
+  async function unlockDoor(id) {
+    const response = await fetch(`/api/equipment/${id}`, {
+      method: "PATCH",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({is_sealed: false, state: "available", minutes_remaining: 0})
+    });
+    if (response.ok) {
+      localStorage.removeItem("spinflow_active_station");
+      localStorage.removeItem("spinflow_start_time");
+      notify("Door Released", "Station is now available.");
+      setTimeout(() => location.reload(), 1200);
+    }
+  }
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeEmergencyModal();
+  });
+
+  updatePipelineStages();
+  startCountdown();
+    let cycleCompleted = false;
+
+  async function markCycleComplete() {
+    if (cycleCompleted) return;
+    cycleCompleted = true;
+
+    const chip = document.getElementById("progressLabel");
+    if (chip) { chip.textContent = "Complete"; chip.className = "chip chip-tertiary"; }
+
+    const timerStatus = document.getElementById("timerStatus");
+    if (timerStatus) timerStatus.textContent = "Cycle complete";
+
+    const controlStatus = document.getElementById("controlStatus");
+    if (controlStatus) controlStatus.textContent = "Cycle finished. The door can now be released.";
+
+    try {
+      await fetch(`/api/equipment/${currentStationId}`, {
+        method: "PATCH",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          state: "finished",
+          minutes_remaining: 0,
+          is_sealed: true
+        })
+      });
+      localStorage.removeItem("spinflow_start_time");
+      setTimeout(() => location.reload(), 2000);
+    } catch (err) {
+      if (controlStatus) controlStatus.textContent = "Cycle finished. Reload to sync.";
+    }
+  }
+
+</script>
+{% endif %}
+{% endblock %}
