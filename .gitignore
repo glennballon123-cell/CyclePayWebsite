@@ -16,3 +16,9 @@ __pycache__/
 *.pyc
 *.db
 .env
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.db
+.env
