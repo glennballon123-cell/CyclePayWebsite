@@ -10,3 +10,9 @@ __pycache__/
 .DS_Store
 Thumbs.db
 *.log
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.db
+.env
