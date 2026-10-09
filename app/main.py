@@ -9,6 +9,15 @@ from app.routers import (
 from app.routers.pages import templates
 from config.settings import app_settings, facility_settings, hardware_settings
 
+from dotenv import load_dotenv
+import os
+
+# Load the .env file to get the database URL
+load_dotenv()
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+# Your code now uses the DATABASE_URL from the .env file
+
 
 def create_application() -> FastAPI:
     application = FastAPI(title=facility_settings.facility_name)
