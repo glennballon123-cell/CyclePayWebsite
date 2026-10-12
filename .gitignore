@@ -2,3 +2,12 @@
 __pycache__/
 *.pyc
 laundry.json
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+.env
+.DS_Store
+Thumbs.db
+*.log
+venv/
