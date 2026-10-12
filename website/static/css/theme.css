@@ -863,22 +863,23 @@ body {
     white-space: nowrap;
   }
   .progress-stages {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
   }
-  .progress-stages #stageWashing,
-  .progress-stages #stageRelease {
-    grid-column: span 3;
+  .progress-stages .card {
+    min-height: 3.5rem;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    text-align: left;
+    padding: 0.85rem 1rem;
   }
-}
-
-@media (max-width: 420px) {
-  .progress-stages {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .progress-stages .card .monospace {
+    font-size: 11px;
+    margin-right: 1rem;
   }
-  .progress-stages #stagePayment,
-  .progress-stages #stageWashing,
-  .progress-stages #stageRelease {
-    grid-column: span 2;
+  .progress-stages .card .text-small {
+    font-size: 14px;
   }
 }
 
