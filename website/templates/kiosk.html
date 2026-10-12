@@ -1,0 +1,309 @@
+{% extends "public_base.html" %}
+{% set active = 'kiosk' %}
+{% block title %}Kiosk // {{ facility_name }}{% endblock %}
+{% block content %}
+
+<div style="max-width: 1400px; margin: 0 auto;">
+
+  <div class="space-below-large">
+    <h1 class="text-headline semibold">Kiosk &amp; Payment</h1>
+    <p class="text-base dim" style="margin-top: 0.5rem;">Weigh your load, choose a program, then pay to start the cycle.</p>
+  </div>
+
+  <div class="split-wide-narrow">
+
+    <div class="stack">
+
+      <div class="card">
+        <div class="row space-between align-center space-below-medium row-wrap gap-small">
+          <h2 class="text-title semibold">Step 1 — Weigh &amp; Price</h2>
+          <span class="badge badge-primary monospace">{{ format_currency(hardware_price_per_kg) }} / kg</span>
+        </div>
+
+        <form method="post" action="/kiosk/pay" id="kioskForm" class="stack">
+          <div class="columns-two gap-medium">
+            <div class="row row-column gap-small">
+              <label class="monospace text-mini dim uppercase">Station</label>
+              <select name="station_number" class="input-field monospace">
+                {% for unit in units %}
+                <option value="{{ unit.station_number }}">Bay #{{ '%02d'|format(unit.station_number) }} — {{ format_state_label(unit.state) }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="row row-column gap-small">
+              <label class="monospace text-mini dim uppercase">Measured Weight (kg)</label>
+              <input name="measured_kg" type="number" step="0.1" min="0" value="0.0" class="input-field monospace">
+            </div>
+          </div>
+
+          <div class="card card-muted">
+            <div class="row space-between align-center space-below-medium row-wrap gap-small">
+              <div>
+                <div class="monospace text-mini dim uppercase">Computed Price</div>
+                <div class="text-headline monospace tone-success semibold" id="priceDisplay">{{ format_currency(0) }}</div>
+              </div>
+              <div class="align-text-right">
+                <div class="monospace text-mini dim uppercase">Load</div>
+                <div id="capacityLabel" class="t-md mono">0.00 kg</div>
+              </div>
+            </div>
+            <div class="meter"><div class="meter-fill primary" id="priceBar" style="width: 0%;"></div></div>
+          </div>
+
+          <div>
+            <h2 class="text-title semibold space-below-small">Step 2 — Choose Program</h2>
+            <input type="hidden" name="cycle_key" id="programInput" value="">
+            <div class="columns-two gap-medium" id="programGrid">
+              {% for key, program in cycle_programs.items() %}
+              <div class="card card-muted program-card" data-key="{{ key }}" data-label="{{ program.label }}" data-rate="{{ program.price_per_kg }}" data-minutes="{{ program.base_minutes }}" data-perkg="{{ program.minutes_per_kg }}" style="cursor: pointer; border: 1px solid #3d494c;">
+                <div class="row space-between align-center space-below-small">
+                  <div class="text-large semibold">{{ program.label }}</div>
+                </div>
+                <div class="monospace text-mini dim">{{ program.base_minutes }} min · {{ program.temperature_celsius }}°C · {{ program.rotation_rpm }} RPM</div>
+                <div class="monospace text-small tone-success semibold space-above-medium">{{ format_currency(program.price_per_kg) }} / kg</div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+
+          {% if error %}
+          <div class="card card-muted" style="border-color: #ffb4ab;">
+            <div class="text-small tone-error">{{ error }}</div>
+          </div>
+          {% endif %}
+        </form>
+      </div>
+
+    </div>
+
+    <div class="stack">
+
+      <div class="card">
+        <h2 class="text-title semibold space-below-medium">Step 3 — Confirm Payment</h2>
+        <div class="card card-muted space-below-medium">
+          <div class="row space-between space-below-small">
+            <span class="monospace text-mini dim uppercase">Selected Program</span>
+            <span id="summaryProgram" class="monospace text-small semibold">—</span>
+          </div>
+          <div class="row space-between space-below-small">
+            <span class="monospace text-mini dim uppercase">Load</span>
+            <span id="summaryLoad" class="monospace text-small">0.00 kg</span>
+          </div>
+          <div class="row space-between space-below-small">
+            <span class="monospace text-mini dim uppercase">Time</span>
+            <span id="summaryTime" class="monospace text-small">0 min</span>
+          </div>
+          <div class="row space-between space-below-small">
+            <span class="monospace text-mini dim uppercase">Station</span>
+            <span id="summaryStation" class="monospace text-small">Bay #01</span>
+          </div>
+          <div style="border-top: 1px solid var(--outline-variant); padding-top: 0.75rem; margin-top: 0.75rem; display: flex; justify-content: space-between; align-items: baseline;">
+            <span class="t-lg semibold">Total Due</span>
+            <span id="summaryTotal" class="t-2xl mono accent-primary bold">{{ format_currency(0) }}</span>
+          </div>
+        </div>
+        <div class="card card-muted space-below-medium">
+          <div class="row space-between">
+            <span class="monospace text-mini dim uppercase">Your Wallet</span>
+            <span class="monospace text-small tone-success semibold">{{ format_currency(account.balance) if account else format_currency(0) }}</span>
+          </div>
+        </div>
+        <button type="button" id="confirmButton" class="button button-primary full-width space-center" style="padding: 0.85rem;" onclick="submitPayment()">Confirm Payment &amp; Start Cycle</button>
+      </div>
+
+      <div class="card card-muted">
+        <div class="monospace text-mini dim uppercase space-below-small">How It Works</div>
+        <div class="text-small dim">Payment is required before the cycle can start. Once paid, your unique voucher QR is issued and the simulation starts automatically.</div>
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+
+{% if issued_code %}
+<div id="voucherBackdrop" style="position:fixed;inset:0;z-index:9999;background:rgba(8,14,29,0.75);display:flex;align-items:center;justify-content:center;padding:1rem;">
+  <div class="card" style="max-width:22rem;width:100%;text-align:center;border-color:#4edea3;">
+    <div class="monospace text-mini dim uppercase space-below-small">Voucher Issued</div>
+    <div class="text-title monospace tone-success semibold space-below-medium">{{ issued_code }}</div>
+    <div id="qrHolder" data-code="{{ issued_code }}" style="background:white;padding:12px;border-radius:0.75rem;display:inline-block;"></div>
+    <div class="monospace text-mini dim space-above-medium">Starting simulation...</div>
+  </div>
+</div>
+<script>
+(function () {
+  var holder = document.getElementById("qrHolder");
+  var code = holder ? holder.dataset.code : "";
+  if (holder && code && typeof QRCode !== "undefined") {
+    new QRCode(holder, {
+      text: code,
+      width: 180,
+      height: 180,
+      colorDark: "#000000",
+      colorLight: "#ffffff",
+      correctLevel: QRCode.CorrectLevel.M
+    });
+    holder.removeAttribute("title");
+    var el = holder.querySelector("img,canvas,svg");
+    if (el) el.removeAttribute("title");
+  }
+  setTimeout(function () {
+    window.location.href = "/progress";
+  }, 3000);
+})();
+</script>
+{% endif %}
+
+<div id="noticeBackdrop" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(8,14,29,0.75);align-items:center;justify-content:center;padding:1rem;">
+  <div class="card" style="max-width:22rem;width:100%;text-align:center;">
+    <div class="text-title" id="noticeIcon" style="color:#ffb4ab;margin-bottom:0.75rem;">!</div>
+    <h2 class="text-large semibold space-below-small" id="noticeTitle">Notice</h2>
+    <p class="text-small dim space-below-medium" id="noticeMessage">Something needs your attention.</p>
+    <div class="row space-center">
+      <button type="button" class="button button-primary" id="noticeOk" style="min-width:8rem;justify-content:center;">Got it</button>
+    </div>
+  </div>
+</div>
+
+<script src="/static/js/qrcode.min.js"></script>
+<script>
+(function () {
+  var PRICE_CEILING = 5000;
+
+  function format(amount) {
+    return "₱" + amount.toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  }
+
+  function showNotice(title, message, tone) {
+    var backdrop = document.getElementById("noticeBackdrop");
+    var icon = document.getElementById("noticeIcon");
+    var heading = document.getElementById("noticeTitle");
+    var body = document.getElementById("noticeMessage");
+    var colors = { error: "#ffb4ab", warning: "#f5a524", info: "#4cd7f6" };
+    var picked = colors[tone] || colors.error;
+    icon.style.color = picked;
+    icon.textContent = tone === "info" ? "i" : "!";
+    heading.textContent = title;
+    body.textContent = message;
+    backdrop.style.display = "flex";
+  }
+
+  function closeNotice() {
+    document.getElementById("noticeBackdrop").style.display = "none";
+  }
+
+  document.getElementById("noticeOk").addEventListener("click", closeNotice);
+  document.getElementById("noticeBackdrop").addEventListener("click", function (event) {
+    if (event.target === this) closeNotice();
+  });
+
+  function programCard() {
+    var input = document.getElementById("programInput");
+    var key = input ? input.value : "";
+    if (!key) return null;
+    return document.querySelector(".program-card[data-key='" + key + "']");
+  }
+
+  function weightValue() {
+    var field = document.querySelector("input[name='measured_kg']");
+    var value = field ? parseFloat(field.value) : 0;
+    return isNaN(value) ? 0 : value;
+  }
+
+  function update() {
+    var card = programCard();
+    var weight = weightValue();
+    var priceNode = document.getElementById("priceDisplay");
+    var summaryLoad = document.getElementById("summaryLoad");
+    var summaryTime = document.getElementById("summaryTime");
+    var summaryTotal = document.getElementById("summaryTotal");
+    var summaryProgram = document.getElementById("summaryProgram");
+    var capacityLabel = document.getElementById("capacityLabel");
+    var bar = document.getElementById("priceBar");
+
+    if (!card) {
+      if (priceNode) priceNode.textContent = format(0);
+      if (summaryLoad) summaryLoad.textContent = weight.toFixed(2) + " kg";
+      if (summaryTime) summaryTime.textContent = "0 min";
+      if (summaryTotal) summaryTotal.textContent = format(0);
+      if (summaryProgram) summaryProgram.textContent = "—";
+      if (capacityLabel) capacityLabel.textContent = weight.toFixed(2) + " kg";
+      if (bar) bar.style.width = "0%";
+      return;
+    }
+
+    var rate = parseFloat(card.dataset.rate || "60");
+    var label = card.dataset.label || "Standard";
+    var price = weight * rate;
+    var minutes = weight > 0 ? Math.max(1, Math.round(parseFloat(card.dataset.minutes || "20") + weight * parseFloat(card.dataset.perkg || "4"))) : 0;
+
+    if (priceNode) priceNode.textContent = format(price);
+    if (summaryProgram) summaryProgram.textContent = label;
+    if (summaryLoad) summaryLoad.textContent = weight.toFixed(2) + " kg";
+    if (summaryTotal) summaryTotal.textContent = format(price);
+    if (summaryTime) summaryTime.textContent = minutes + " min";
+    if (capacityLabel) capacityLabel.textContent = weight.toFixed(2) + " kg";
+
+    if (bar) {
+      var percent = PRICE_CEILING > 0 ? (price / PRICE_CEILING) * 100 : 0;
+      bar.style.width = Math.min(percent, 100) + "%";
+      bar.style.background = "";
+      if (percent >= 90) {
+        bar.style.background = "linear-gradient(90deg, #f5a524, #ffb4ab)";
+      } else if (percent >= 60) {
+        bar.style.background = "linear-gradient(90deg, #1bbd85, #4edea3)";
+      } else {
+        bar.style.background = "linear-gradient(90deg, #06b6d4, #4cd7f6)";
+      }
+    }
+  }
+
+  function choose(card) {
+    document.getElementById("programInput").value = card.dataset.key;
+    document.querySelectorAll(".program-card").forEach(function (other) {
+      var active = other === card;
+      other.style.borderColor = active ? "#06b6d4" : "#3d494c";
+      other.style.boxShadow = active ? "0 0 16px rgba(6,182,212,0.35)" : "none";
+    });
+    update();
+  }
+
+  window.submitPayment = function () {
+    var weight = weightValue();
+    var card = programCard();
+    if (!card) {
+      showNotice("Choose a Program", "Pick one of the cycle programs in Step 2 before continuing.", "warning");
+      return;
+    }
+    if (weight <= 0) {
+      showNotice("Enter a Weight", "Type the measured weight in kilograms before continuing.", "warning");
+      return;
+    }
+    document.getElementById("kioskForm").submit();
+  };
+
+  document.querySelectorAll(".program-card").forEach(function (card) {
+    card.addEventListener("click", function () { choose(card); });
+  });
+
+  var weightField = document.querySelector("input[name='measured_kg']");
+  if (weightField) weightField.addEventListener("input", update);
+
+  var stationField = document.querySelector("select[name='station_number']");
+  if (stationField) {
+    stationField.addEventListener("change", function () {
+      var summaryStation = document.getElementById("summaryStation");
+      if (summaryStation) summaryStation.textContent = "Bay #" + String(stationField.value).padStart(2, "0");
+      update();
+    });
+  }
+
+  update();
+})();
+</script>
+
+{% endblock %}

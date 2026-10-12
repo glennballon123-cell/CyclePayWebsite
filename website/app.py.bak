@@ -1,0 +1,394 @@
+from fastapi import FastAPI, Form, Request
+from fastapi.responses import HTMLResponse, RedirectResponse, PlainTextResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+
+from website import data, store
+
+app = FastAPI(title=data.FACILITY_NAME)
+app.mount("/static", StaticFiles(directory="website/static"), name="static")
+templates = Jinja2Templates(directory="website/templates")
+
+SESSION_COOKIE = "laundry_session"
+
+
+@app.on_event("startup")
+def startup():
+    if not store.store.load():
+        store.seed()
+
+
+def current_account(request: Request):
+    account_id = request.cookies.get(SESSION_COOKIE)
+    if not account_id:
+        return None
+    try:
+        return store.find_account(int(account_id))
+    except ValueError:
+        return None
+
+
+def is_admin(account):
+    return account is not None and account.role == "admin"
+
+
+def render(request, template, account, active, **extra):
+    context = {
+        "request": request,
+        "account": account,
+        "active": active,
+        "facility_name": data.FACILITY_NAME,
+        "facility_location": data.FACILITY_LOCATION,
+        "facility_short_code": data.FACILITY_SHORT_CODE,
+        "facility_hotline": data.FACILITY_HOTLINE,
+        "facility_support_email": data.FACILITY_SUPPORT_EMAIL,
+        "hardware_firmware": data.HARDWARE_FIRMWARE,
+        "hardware_price_per_kg": data.HARDWARE_PRICE_PER_KG,
+        "hardware_minimum_kg": data.HARDWARE_MINIMUM_KG,
+        "hardware_max_load_kg": data.HARDWARE_MAX_LOAD_KG,
+        "cycle_programs": data.CYCLE_PROGRAMS,
+        "equipment_states": data.EQUIPMENT_STATES,
+        "format_currency": data.format_currency,
+        "format_bay_label": data.format_bay_label,
+        "format_load": data.format_load,
+        "format_temperature": data.format_temperature,
+        "format_rotation": data.format_rotation,
+        "format_duration": data.format_duration,
+        "format_state_label": data.format_state_label,
+        "format_capacity_percentage": data.format_capacity_percentage,
+        "format_moment": data.format_moment,
+        "format_clock": data.format_clock,
+        "resolve_cycle": data.resolve_cycle,
+        "compute_duration": data.compute_duration,
+        "compute_price": data.compute_price,
+    }
+    context.update(extra)
+    return templates.TemplateResponse(request, template, context)
+
+
+def guard_admin(account):
+    if not is_admin(account):
+        return RedirectResponse("/access", status_code=303)
+    return None
+
+
+@app.get("/", response_class=HTMLResponse)
+def landing(request: Request):
+    return render(request, "landing.html", current_account(request), "landing", hide_nav=True)
+
+
+@app.get("/access", response_class=HTMLResponse)
+def access_page(request: Request):
+    return render(request, "access.html", current_account(request), "access", hide_nav=True)
+
+
+@app.post("/access")
+def access_submit(request: Request, contact: str = Form(...), credential: str = Form(...), role: str = Form("client")):
+    account = store.find_account_by_contact(contact)
+    if not account or account.credential != credential:
+        return render(request, "access.html", None, "access", hide_nav=True, error="Invalid credentials.")
+    if role == "admin" and account.role != "admin":
+        return render(request, "access.html", None, "access", hide_nav=True, error="Invalid credentials.")
+    if role == "client" and account.role != "client":
+        return render(request, "access.html", None, "access", hide_nav=True, error="Invalid credentials.")
+    target = "/overview" if account.role == "admin" else "/kiosk"
+    response = RedirectResponse(target, status_code=303)
+    response.set_cookie(SESSION_COOKIE, str(account.id), httponly=True, samesite="lax")
+    return response
+
+
+@app.post("/register")
+def register_submit(request: Request, display_name: str = Form(...), contact_number: str = Form(...), credential: str = Form(...)):
+    if store.find_account_by_contact(contact_number):
+        return render(request, "access.html", None, "access", hide_nav=True, error="Contact number already registered.")
+    store.create_account(display_name, contact_number, credential, "client", 0.0)
+    store.persist()
+    return render(request, "access.html", None, "access", hide_nav=True, success="Account created. You can now log in.")
+
+
+@app.post("/logout")
+def logout():
+    response = RedirectResponse("/", status_code=303)
+    response.delete_cookie(SESSION_COOKIE)
+    return response
+
+
+@app.get("/kiosk", response_class=HTMLResponse)
+def kiosk(request: Request):
+    return render(request, "kiosk.html", current_account(request), "kiosk", units=store.list_equipment())
+
+
+@app.post("/kiosk/pay")
+def kiosk_pay(request: Request, station_number: int = Form(...), measured_kg: float = Form(...), cycle_key: str = Form("standard")):
+    account = current_account(request)
+    unit = store.find_equipment_by_station(station_number)
+    if not account or not unit:
+        return RedirectResponse("/kiosk", status_code=303)
+    amount = data.compute_price(measured_kg, cycle_key)
+    if account.balance < amount:
+        return render(request, "kiosk.html", account, "kiosk", units=store.list_equipment(), error="Insufficient balance.")
+    account.balance -= amount
+    program = data.resolve_cycle(cycle_key)
+    duration = data.compute_duration(cycle_key, measured_kg)
+    sequence = len(store.store.instruments) + 1
+    code = data.build_instrument_code(station_number, sequence)
+    instrument = store.create_instrument(code, amount, measured_kg, station_number, cycle_key, account.id)
+    unit.state = "running"
+    unit.load_kg = measured_kg
+    unit.minutes_remaining = duration
+    unit.cycle_key = cycle_key
+    unit.is_sealed = True
+    unit.is_door_closed = True
+    unit.active_instrument_code = instrument.code
+    unit.temperature_celsius = program["temperature_celsius"]
+    unit.rotation_rpm = program["rotation_rpm"]
+    store.create_session(account.id, station_number, measured_kg, program["label"], amount, "balance")
+    store.create_journal_entry("settlement", data.format_bay_label(station_number), f"Settlement balance {amount:.2f}. Instrument {instrument.code}", account.display_name, "completed")
+    store.persist()
+    return render(request, "kiosk.html", account, "kiosk", units=store.list_equipment(), issued_code=instrument.code, issued_station=station_number, issued_minutes=duration)
+
+
+@app.get("/progress", response_class=HTMLResponse)
+def progress(request: Request):
+    account = current_account(request)
+    unit = None
+    latest_session = None
+    if account:
+        sessions = store.list_sessions_for_account(account.id)
+        if sessions:
+            latest_session = sessions[0]
+            unit = store.find_equipment_by_station(latest_session.station_number)
+    if not unit:
+        running = [u for u in store.list_equipment() if u.state == "running"]
+        unit = running[0] if running else None
+    if not unit:
+        all_units = store.list_equipment()
+        unit = all_units[0] if all_units else None
+    return render(request, "progress.html", account, "progress", unit=unit, latest_session=latest_session)
+
+
+@app.post("/progress/complete")
+def progress_complete(request: Request, equipment_id: int = Form(...)):
+    store.update_equipment(equipment_id, state="finished", minutes_remaining=0, is_sealed=True)
+    store.persist()
+    return RedirectResponse("/progress", status_code=303)
+
+
+@app.post("/progress/release")
+def progress_release(request: Request, equipment_id: int = Form(...)):
+    store.update_equipment(equipment_id, state="available", minutes_remaining=0, is_sealed=False, active_instrument_code=None)
+    store.persist()
+    return RedirectResponse("/progress", status_code=303)
+
+
+@app.post("/progress/help")
+def progress_help(request: Request, equipment_id: int = Form(...)):
+    account = current_account(request)
+    unit = store.find_equipment(equipment_id)
+    if unit:
+        store.create_journal_entry("administration", data.format_bay_label(unit.station_number), "Attendant help requested from client console", account.display_name if account else "Guest", "notified")
+    store.persist()
+    return RedirectResponse("/progress", status_code=303)
+
+
+@app.get("/wallet", response_class=HTMLResponse)
+def wallet(request: Request):
+    account = current_account(request)
+    if not account:
+        return RedirectResponse("/access", status_code=303)
+    return render(request, "wallet.html", account, "wallet", trips=store.list_sessions_for_account(account.id))
+
+
+@app.get("/overview", response_class=HTMLResponse)
+def overview(request: Request):
+    account = current_account(request)
+    redirect = guard_admin(account)
+    if redirect:
+        return redirect
+    return render(request, "overview.html", account, "overview", units=store.list_equipment(), entries=store.list_journal()[:20])
+
+
+@app.get("/equipment", response_class=HTMLResponse)
+def equipment_page(request: Request):
+    account = current_account(request)
+    redirect = guard_admin(account)
+    if redirect:
+        return redirect
+    return render(request, "equipment.html", account, "equipment", units=store.list_equipment(), accounts=store.list_accounts(), instruments=store.list_instruments())
+
+
+@app.post("/equipment/add")
+def equipment_add(request: Request, station_number: int = Form(...)):
+    account = current_account(request)
+    redirect = guard_admin(account)
+    if redirect:
+        return redirect
+    if not store.find_equipment_by_station(station_number):
+        store.create_equipment(station_number, "available", 0.0, data.HARDWARE_MAX_LOAD_KG)
+    store.persist()
+    return RedirectResponse("/equipment", status_code=303)
+
+
+@app.post("/equipment/{equipment_id}/seal")
+def equipment_seal(request: Request, equipment_id: int):
+    account = current_account(request)
+    redirect = guard_admin(account)
+    if redirect:
+        return redirect
+    unit = store.find_equipment(equipment_id)
+    if unit:
+        store.update_equipment(equipment_id, is_sealed=not unit.is_sealed)
+        store.create_journal_entry("administration", data.format_bay_label(unit.station_number), "Door unlocked" if not unit.is_sealed else "Door locked", account.display_name, "confirmed")
+    store.persist()
+    return RedirectResponse("/equipment", status_code=303)
+
+
+@app.post("/equipment/{equipment_id}/pulse")
+def equipment_pulse(request: Request, equipment_id: int):
+    account = current_account(request)
+    redirect = guard_admin(account)
+    if redirect:
+        return redirect
+    unit = store.find_equipment(equipment_id)
+    if unit:
+        store.update_equipment(equipment_id, is_sealed=False, is_door_closed=False)
+        store.create_journal_entry("administration", data.format_bay_label(unit.station_number), "Coil pulse dispatched", account.display_name, "confirmed")
+    store.persist()
+    return RedirectResponse("/equipment", status_code=303)
+
+
+@app.post("/equipment/{equipment_id}/tare")
+def equipment_tare(request: Request, equipment_id: int):
+    account = current_account(request)
+    redirect = guard_admin(account)
+    if redirect:
+        return redirect
+    unit = store.find_equipment(equipment_id)
+    if unit:
+        store.update_equipment(equipment_id, load_kg=0.0)
+        store.create_journal_entry("measurement", data.format_bay_label(unit.station_number), "Scale tared to zero", account.display_name, "calibrated")
+    store.persist()
+    return RedirectResponse("/equipment", status_code=303)
+
+
+@app.post("/equipment/{equipment_id}/state")
+def equipment_state(request: Request, equipment_id: int, state: str = Form(...)):
+    account = current_account(request)
+    redirect = guard_admin(account)
+    if redirect:
+        return redirect
+    if state in data.EQUIPMENT_STATES:
+        store.update_equipment(equipment_id, state=state)
+        unit = store.find_equipment(equipment_id)
+        store.create_journal_entry("administration", data.format_bay_label(unit.station_number), f"State changed to {state}", account.display_name, "confirmed")
+    store.persist()
+    return RedirectResponse("/equipment", status_code=303)
+
+
+@app.post("/equipment/{equipment_id}/delete")
+def equipment_delete(request: Request, equipment_id: int):
+    account = current_account(request)
+    redirect = guard_admin(account)
+    if redirect:
+        return redirect
+    store.delete_equipment(equipment_id)
+    store.persist()
+    return RedirectResponse("/equipment", status_code=303)
+
+
+@app.post("/equipment/issue")
+def equipment_issue(request: Request, station_number: int = Form(...), measured_kg: float = Form(...), cycle_key: str = Form("standard")):
+    account = current_account(request)
+    redirect = guard_admin(account)
+    if redirect:
+        return redirect
+    amount = data.compute_price(measured_kg, cycle_key)
+    sequence = len(store.store.instruments) + 1
+    code = data.build_instrument_code(station_number, sequence)
+    store.create_instrument(code, amount, measured_kg, station_number, cycle_key, None)
+    store.create_journal_entry("administration", data.format_bay_label(station_number), f"Voucher issued {code} for {measured_kg:.2f} kg", account.display_name, "granted")
+    store.persist()
+    return RedirectResponse("/equipment", status_code=303)
+
+
+@app.post("/accounts/{account_id}/credit")
+def accounts_credit(request: Request, account_id: int, amount: float = Form(...)):
+    account = current_account(request)
+    redirect = guard_admin(account)
+    if redirect:
+        return redirect
+    target = store.find_account(account_id)
+    if target:
+        target.balance = max(target.balance + amount, 0.0)
+    store.persist()
+    return RedirectResponse("/equipment", status_code=303)
+
+
+@app.post("/accounts/{account_id}/balance")
+def accounts_balance(request: Request, account_id: int, amount: float = Form(...)):
+    account = current_account(request)
+    redirect = guard_admin(account)
+    if redirect:
+        return redirect
+    if amount >= 0:
+        store.update_account(account_id, balance=amount)
+    store.persist()
+    return RedirectResponse("/equipment", status_code=303)
+
+
+@app.post("/accounts/{account_id}/delete")
+def accounts_delete(request: Request, account_id: int):
+    account = current_account(request)
+    redirect = guard_admin(account)
+    if redirect:
+        return redirect
+    store.delete_account(account_id)
+    store.persist()
+    return RedirectResponse("/equipment", status_code=303)
+
+
+@app.get("/journal", response_class=HTMLResponse)
+def journal_page(request: Request, category: str = "", q: str = ""):
+    account = current_account(request)
+    redirect = guard_admin(account)
+    if redirect:
+        return redirect
+    return render(request, "journal.html", account, "journal", entries=store.list_journal(category=category or None, query=q), active_category=category, search_term=q)
+
+
+@app.get("/journal/export", response_class=PlainTextResponse)
+def journal_export(request: Request, category: str = "", q: str = ""):
+    account = current_account(request)
+    redirect = guard_admin(account)
+    if redirect:
+        return redirect
+    entries = store.list_journal(category=category or None, query=q)
+    lines = ["occurred_at,category,station,description,actor,outcome"]
+    for entry in entries:
+        lines.append(f"{entry.occurred_at},{entry.category},{entry.station_label},\"{entry.description}\",{entry.actor_label},{entry.outcome}")
+    return PlainTextResponse("\n".join(lines), headers={"Content-Disposition": "attachment; filename=journal_export.csv"})
+
+
+@app.post("/journal/{entry_id}/delete")
+def journal_delete(request: Request, entry_id: int):
+    account = current_account(request)
+    redirect = guard_admin(account)
+    if redirect:
+        return redirect
+    store.delete_journal_entry(entry_id)
+    store.persist()
+    return RedirectResponse("/journal", status_code=303)
+
+
+
+
+
+
+@app.get("/policy", response_class=HTMLResponse)
+def policy_page(request: Request):
+    return render(request, "policy.html", current_account(request), "policy")
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}

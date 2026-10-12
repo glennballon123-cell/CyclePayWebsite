@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}{{ facility_name }}{% endblock %}</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/theme.css">
+</head>
+<body>
+
+{% if not hide_nav %}
+<header class="public-top-strip">
+  <div>
+    <span class="monospace uppercase heavy" style="color: #dde2f8;">{{ facility_name }} <span class="tone-primary">// CALBAYOG</span></span>
+  </div>
+  <nav>
+    <a href="/kiosk" {% if active == 'kiosk' %}class="active"{% endif %}>Kiosk</a>
+    <a href="/wallet" {% if active == 'wallet' %}class="active"{% endif %}>Wallet</a>
+    <a href="/progress" {% if active == 'progress' %}class="active"{% endif %}>Progress</a>
+  </nav>
+  <div class="row align-center gap-medium">
+    {% if account %}
+      {% if account.role == 'admin' %}
+      <a href="/overview" class="button button-success">Admin Console</a>
+      {% endif %}
+      <div class="align-text-right">
+        <div class="text-small semibold">{{ account.display_name }}</div>
+        <div class="text-mini monospace tone-success">{{ format_currency(account.balance) }}</div>
+      </div>
+      <form method="post" action="/logout">
+        <button type="submit" class="button button-secondary">Logout</button>
+      </form>
+    {% else %}
+      <a href="/access" class="button button-primary">Login</a>
+    {% endif %}
+  </div>
+</header>
+{% endif %}
+
+<main class="public-body">
+  {% block content %}{% endblock %}
+</main>
+
+<footer class="public-footer">
+  <div>{{ facility_name }} // CALBAYOG</div>
+  <div>BSIT-3B by EJG</div>
+</footer>
+
+<script src="/static/js/app.js"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

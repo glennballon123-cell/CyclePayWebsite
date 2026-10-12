@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% set active = 'overview' %}
+{% block title %}Overview // {{ facility_name }}{% endblock %}
+{% block content %}
+
+<div class="stack">
+
+  <div class="row space-between align-end row-wrap gap-medium">
+    <div>
+      <div class="monospace text-mini dim uppercase">Admin Console</div>
+      <h1 class="text-title semibold">Facility Overview</h1>
+    </div>
+  </div>
+
+  <div class="columns-four">
+    <div class="summary-tile">
+      <div class="monospace text-mini dim uppercase">Total Stations</div>
+      <div class="text-title monospace semibold">{{ units|length }}</div>
+      <div class="meter space-above-medium"><div class="meter-fill primary" style="width: 100%;"></div></div>
+    </div>
+    <div class="summary-tile">
+      <div class="monospace text-mini dim uppercase">Running</div>
+      <div class="text-title monospace tone-primary semibold">{{ units|selectattr('state', 'equalto', 'running')|list|length }}</div>
+      <div class="text-mini dim">Cycles active</div>
+    </div>
+    <div class="summary-tile">
+      <div class="monospace text-mini dim uppercase">Available</div>
+      <div class="text-title monospace tone-success semibold">{{ units|selectattr('state', 'equalto', 'available')|list|length }}</div>
+      <div class="text-mini dim">Ready to use</div>
+    </div>
+    <div class="summary-tile">
+      <div class="monospace text-mini dim uppercase">Sealed Doors</div>
+      <div class="text-title monospace semibold">{{ units|selectattr('is_sealed')|list|length }}/{{ units|length }}</div>
+      <div class="text-mini dim">Solenoids latched</div>
+    </div>
+  </div>
+
+  <div class="split-main-side">
+
+    <div class="card panel-scroll">
+      <div class="panel-scroll-header">
+        <h2 class="text-large semibold">Live Stations</h2>
+        <span class="monospace text-mini dim">Select to manage</span>
+      </div>
+      <div class="panel-scroll-body">
+        <div class="columns-four gap-small">
+          {% for unit in units %}
+          <a href="/equipment" class="card card-muted" style="text-decoration: none; color: inherit;">
+            <div class="row space-between align-center space-below-small">
+              <span class="monospace semibold tone-primary">Bay #{{ '%02d'|format(unit.station_number) }}</span>
+              <span class="badge {% if unit.state == 'running' %}badge-primary{% elif unit.state == 'available' %}badge-success{% else %}badge-muted{% endif %}">{{ unit.state }}</span>
+            </div>
+            <div class="monospace text-large semibold space-below-small">{{ '%.2f'|format(unit.load_kg) }}<span class="text-mini dim">kg</span></div>
+            <div class="meter space-below-small">
+              <div class="meter-fill primary" style="width: {{ format_capacity_percentage(unit.load_kg, unit.capacity_kg) }}%;"></div>
+            </div>
+            <div class="row space-between monospace text-mini dim">
+              <span>{{ format_temperature(unit.temperature_celsius) }}</span>
+              <span>{% if unit.is_sealed %}Locked{% else %}Open{% endif %}</span>
+            </div>
+          </a>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="card panel-scroll">
+      <div class="panel-scroll-header">
+        <h2 class="text-large semibold">Recent Activity</h2>
+        <a href="/journal" class="monospace text-mini tone-primary">View all</a>
+      </div>
+      <div class="panel-scroll-body">
+        <div class="stack">
+          {% for entry in entries %}
+          <div class="card card-muted" style="padding: 0.6rem 0.75rem;">
+            <div class="row space-between align-center space-below-small">
+              <span class="monospace text-mini dim">{{ format_clock(entry.occurred_at) }}</span>
+              <span class="badge {% if entry.outcome in ['completed', 'calibrated', 'sealed'] %}badge-success{% else %}badge-primary{% endif %}">{{ entry.outcome }}</span>
+            </div>
+            <div class="monospace text-mini tone-primary space-below-small">{{ entry.station_label }}</div>
+            <div class="text-mini dim">{{ entry.description }}</div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+{% endblock %}

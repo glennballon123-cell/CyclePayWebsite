@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}{{ facility_name }}{% endblock %}</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/theme.css">
+</head>
+<body>
+
+<div class="page-frame">
+
+  <aside class="side-panel">
+    <div class="facility-tag">Admin Console</div>
+    <h3>{{ facility_name }}</h3>
+    <div class="location-tag">{{ facility_location }}</div>
+
+    <div class="section-tag">Operations</div>
+    <a href="/overview" {% if active == 'overview' %}aria-current="page"{% endif %}>Overview</a>
+    <a href="/equipment" {% if active == 'equipment' %}aria-current="page"{% endif %}>Equipment</a>
+    <a href="/journal" {% if active == 'journal' %}aria-current="page"{% endif %}>Journal</a>
+
+    <div class="section-tag">Reference</div>
+    <a href="/policy" {% if active == 'policy' %}aria-current="page"{% endif %}>Policy</a>
+
+    <div class="space-above-medium">
+      <a href="/kiosk" class="client-switch">Switch to Client View</a>
+    </div>
+  </aside>
+
+  <div class="workspace">
+
+    <header class="top-strip">
+      <div>
+        <div class="brand">{{ facility_name }} // ADMIN</div>
+        <div class="subtitle">{{ facility_location }}</div>
+      </div>
+      <div class="row align-center gap-medium">
+        {% if account %}
+        <div class="align-text-right">
+          <div class="text-small semibold">{{ account.display_name }}</div>
+          <div class="text-mini monospace tone-success">{{ format_currency(account.balance) }}</div>
+        </div>
+        <form method="post" action="/logout">
+          <button type="submit" class="button button-secondary">Logout</button>
+        </form>
+        {% endif %}
+      </div>
+    </header>
+
+    <main class="page-body">
+      {% block content %}{% endblock %}
+    </main>
+
+  </div>
+</div>
+
+<script src="/static/js/app.js"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% set active = 'journal' %}
+{% block title %}Journal // {{ facility_name }}{% endblock %}
+{% block content %}
+
+<div class="stack">
+
+  <div class="row space-between align-end row-wrap gap-medium">
+    <div>
+      <div class="monospace text-mini dim uppercase">Admin Console</div>
+      <h1 class="text-title semibold">Operations Journal</h1>
+    </div>
+    <div class="row gap-small row-wrap">
+      <a href="/journal/export" class="button button-primary">Export CSV</a>
+    </div>
+  </div>
+
+  <form method="get" action="/journal" class="card row gap-small align-center row-wrap" style="padding: 0.75rem;">
+    <a href="/journal" class="button {% if not active_category %}button-primary{% else %}button-secondary{% endif %}" style="font-size: 10px; padding: 0.4rem 0.75rem;">All</a>
+    <a href="/journal?category=settlement" class="button {% if active_category == 'settlement' %}button-primary{% else %}button-secondary{% endif %}" style="font-size: 10px; padding: 0.4rem 0.75rem;">Settlement</a>
+    <a href="/journal?category=access" class="button {% if active_category == 'access' %}button-primary{% else %}button-secondary{% endif %}" style="font-size: 10px; padding: 0.4rem 0.75rem;">Access</a>
+    <a href="/journal?category=measurement" class="button {% if active_category == 'measurement' %}button-primary{% else %}button-secondary{% endif %}" style="font-size: 10px; padding: 0.4rem 0.75rem;">Measurement</a>
+    <a href="/journal?category=administration" class="button {% if active_category == 'administration' %}button-primary{% else %}button-secondary{% endif %}" style="font-size: 10px; padding: 0.4rem 0.75rem;">Administration</a>
+    <input name="q" value="{{ search_term }}" placeholder="Search description, station, or reference" class="input-field monospace" style="flex: 1; min-width: 12rem;">
+    <button class="button button-primary" type="submit" style="font-size: 10px; padding: 0.4rem 0.9rem;">Search</button>
+  </form>
+
+  <div class="card panel-scroll">
+    <div class="panel-scroll-header">
+      <h2 class="text-large semibold">Journal Entries</h2>
+      <span class="monospace text-mini dim">{{ entries|length }} entries</span>
+    </div>
+    <div class="panel-scroll-body">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th style="width: 90px;">Time</th>
+            <th style="width: 130px;">Category</th>
+            <th style="width: 110px;">Station</th>
+            <th>Description</th>
+            <th style="width: 130px;">User</th>
+            <th style="width: 110px;">Outcome</th>
+            <th style="width: 90px;" class="align-text-right">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for entry in entries %}
+          <tr>
+            <td class="monospace text-mini">{{ format_clock(entry.occurred_at) }}</td>
+            <td><span class="badge badge-muted">{{ entry.category }}</span></td>
+            <td class="monospace tone-primary">{{ entry.station_label }}</td>
+            <td class="text-small">{{ entry.description }}</td>
+            <td class="text-mini dim">{{ entry.actor_label }}</td>
+            <td><span class="badge {% if entry.outcome in ['completed', 'confirmed', 'granted', 'sealed', 'notified', 'calibrated', 'measured', 'tared'] %}badge-success{% else %}badge-primary{% endif %}">{{ entry.outcome }}</span></td>
+            <td class="align-text-right">
+              <button type="button" class="button button-danger" style="font-size: 10px; padding: 0.3rem 0.6rem;" onclick="confirmDelete('/journal/{{ entry.id }}/delete', 'Delete this entry?', 'This removes the log entry permanently.')">Delete</button>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<div id="confirmBackdrop" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(8,14,29,0.75);align-items:center;justify-content:center;padding:1rem;">
+  <div class="card" style="max-width:22rem;width:100%;text-align:center;">
+    <div class="text-title" style="color:#ffb4ab;margin-bottom:0.75rem;">!</div>
+    <h2 class="text-large semibold space-below-small" id="confirmTitle">Are you sure?</h2>
+    <p class="text-small dim space-below-medium" id="confirmMessage">This cannot be undone.</p>
+    <div class="row gap-small">
+      <button type="button" class="button button-secondary flex-grow space-center" onclick="closeConfirm()">Cancel</button>
+      <button type="button" class="button button-danger flex-grow space-center" id="confirmYes" style="background: rgba(255, 180, 171, 0.15); border-color: #ffb4ab; color: #ffb4ab; font-weight: 700;">Confirm Delete</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var confirmBackdrop = document.getElementById("confirmBackdrop");
+  var confirmTitle = document.getElementById("confirmTitle");
+  var confirmMessage = document.getElementById("confirmMessage");
+  var confirmYes = document.getElementById("confirmYes");
+  var pendingAction = "";
+
+  window.confirmDelete = function (action, title, message) {
+    pendingAction = action;
+    confirmTitle.textContent = title || "Are you sure?";
+    confirmMessage.textContent = message || "This cannot be undone.";
+    confirmBackdrop.style.display = "flex";
+  };
+
+  window.closeConfirm = function () {
+    confirmBackdrop.style.display = "none";
+    pendingAction = "";
+  };
+
+  confirmYes.addEventListener("click", function () {
+    if (!pendingAction) return;
+    var form = document.createElement("form");
+    form.method = "post";
+    form.action = pendingAction;
+    document.body.appendChild(form);
+    form.submit();
+  });
+
+  confirmBackdrop.addEventListener("click", function (event) {
+    if (event.target === confirmBackdrop) closeConfirm();
+  });
+})();
+</script>
+
+{% endblock %}

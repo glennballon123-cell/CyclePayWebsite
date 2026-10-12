@@ -1,0 +1,256 @@
+{% extends "public_base.html" %}
+{% set active = 'progress' %}
+{% block title %}Live Progress // {{ facility_name }}{% endblock %}
+{% block content %}
+
+<div style="max-width: 1400px; margin: 0 auto;">
+
+  {% if unit %}
+
+  <div class="space-below-large">
+    <h1 class="text-headline semibold">{{ format_bay_label(unit.station_number) }} — {{ format_state_label(unit.state) }}</h1>
+    <p class="text-base dim" style="margin-top: 0.5rem;">
+      {% if unit.state == 'running' %}
+      Cycle in progress. The door is sealed until the timer reaches zero.
+      {% elif unit.state == 'finished' %}
+      Cycle complete. You can unlock the door now.
+      {% elif unit.state == 'available' %}
+      Station is idle and ready for a new cycle.
+      {% else %}
+      Station is currently {{ unit.state }}.
+      {% endif %}
+    </p>
+  </div>
+
+  <div class="columns-four space-below-large">
+    <div class="summary-tile">
+      <div class="monospace text-mini dim uppercase">Station</div>
+      <div class="text-headline monospace tone-primary semibold">{{ format_bay_label(unit.station_number) }}</div>
+      <div class="monospace text-mini dim">Firmware {{ unit.firmware_label }}</div>
+    </div>
+    <div class="summary-tile">
+      <div class="monospace text-mini dim uppercase">Remaining</div>
+      <div class="text-headline monospace semibold" id="liveTimer" data-seconds="{{ unit.minutes_remaining * 60 }}" data-state="{{ unit.state }}">{{ format_duration(unit.minutes_remaining) }}</div>
+      <div class="monospace text-mini dim" id="timerStatus">{% if unit.state == 'running' %}Cycle running{% else %}Not running{% endif %}</div>
+    </div>
+    <div class="summary-tile">
+      <div class="monospace text-mini dim uppercase">Temperature</div>
+      <div class="text-headline monospace tone-primary semibold">{{ format_temperature(unit.temperature_celsius) }}</div>
+      <div class="monospace text-mini dim">Sensor reading</div>
+    </div>
+    <div class="summary-tile">
+      <div class="monospace text-mini dim uppercase">Rotation</div>
+      <div class="text-headline monospace tone-accent semibold">{{ format_rotation(unit.rotation_rpm) }}</div>
+      <div class="monospace text-mini dim">Drum speed</div>
+    </div>
+  </div>
+
+  <div class="card space-below-large">
+    <div class="row space-between align-center space-below-medium row-wrap gap-small">
+      <span class="monospace text-mini dim uppercase">Wash Progress</span>
+      <span id="progressState" class="badge {% if unit.state == 'running' %}badge-primary{% elif unit.state == 'finished' %}badge-success{% else %}badge-muted{% endif %}">{{ unit.state }}</span>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.75rem;">
+      <div class="card card-strong" id="stageLoad">
+        <div class="monospace text-mini uppercase heavy space-below-small">Step 01</div>
+        <div class="text-small">Load</div>
+      </div>
+      <div class="card card-strong" id="stageProgram">
+        <div class="monospace text-mini uppercase heavy space-below-small">Step 02</div>
+        <div class="text-small">Program</div>
+      </div>
+      <div class="card card-strong" id="stagePayment">
+        <div class="monospace text-mini uppercase heavy space-below-small">Step 03</div>
+        <div class="text-small">Payment</div>
+      </div>
+      <div class="card card-strong" id="stageWashing">
+        <div class="monospace text-mini uppercase heavy space-below-small">Step 04</div>
+        <div class="text-small">Washing</div>
+      </div>
+      <div class="card card-strong" id="stageRelease">
+        <div class="monospace text-mini uppercase heavy space-below-small">Step 05</div>
+        <div class="text-small">Release</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card space-below-large">
+    <h2 class="text-title semibold space-below-medium">Cycle Controls</h2>
+    <div class="row gap-medium row-wrap">
+      <button type="button" id="pauseButton" class="button button-primary" {% if unit.state != 'running' %}disabled{% endif %}>
+        <span id="pauseLabel">Pause</span>
+      </button>
+      <button type="button" id="stopButton" class="button button-danger" style="background: rgba(255, 180, 171, 0.15); border-color: #ffb4ab; color: #ffb4ab; font-weight: 700;">
+        Emergency Stop
+      </button>
+    </div>
+    <div id="controlStatus" class="monospace text-mini dim space-above-medium"></div>
+  </div>
+
+  {% if latest_session %}
+  <div class="card">
+    <h2 class="text-title semibold space-below-medium">Session Details</h2>
+    <table class="data-table">
+      <thead><tr><th>Started</th><th>Station</th><th>Load</th><th>Cycle</th><th>Amount Paid</th><th>Method</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="monospace text-mini">{{ format_moment(latest_session.started_at) }}</td>
+          <td class="monospace tone-primary">{{ format_bay_label(latest_session.station_number) }}</td>
+          <td class="monospace">{{ format_load(latest_session.load_kg) }}</td>
+          <td>{{ latest_session.cycle_label }}</td>
+          <td class="monospace tone-success heavy">{{ format_currency(latest_session.amount_paid) }}</td>
+          <td><span class="badge badge-muted">{{ latest_session.method }}</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  {% else %}
+
+  <div class="card" style="padding: 3rem; text-align: center;">
+    <p class="text-base dim">No active session at this station.</p>
+    <a href="/kiosk" class="button button-primary" style="display: inline-flex; margin-top: 1rem;">Start a New Wash</a>
+  </div>
+
+  {% endif %}
+
+</div>
+
+{% if unit %}
+<script>
+(function () {
+  var timer = document.getElementById("liveTimer");
+  var timerStatus = document.getElementById("timerStatus");
+  var stageWashing = document.getElementById("stageWashing");
+  var stageRelease = document.getElementById("stageRelease");
+  var progressState = document.getElementById("progressState");
+  var pauseButton = document.getElementById("pauseButton");
+  var pauseLabel = document.getElementById("pauseLabel");
+  var stopButton = document.getElementById("stopButton");
+  var controlStatus = document.getElementById("controlStatus");
+
+  var paused = false;
+  var handle = null;
+  var seconds = timer ? parseInt(timer.dataset.seconds || "0", 10) : 0;
+  var state = timer ? timer.dataset.state : "";
+
+  function paint(card, mode) {
+    if (!card) return;
+    card.style.borderColor = "";
+    card.style.background = "";
+    card.style.opacity = "1";
+    if (mode === "done") {
+      card.style.borderColor = "#4edea3";
+      card.style.background = "rgba(78, 222, 163, 0.08)";
+    } else if (mode === "active") {
+      card.style.borderColor = "#06b6d4";
+      card.style.background = "rgba(6, 182, 212, 0.10)";
+    } else {
+      card.style.opacity = "0.5";
+    }
+  }
+
+  function applyState(current, remaining) {
+    paint(document.getElementById("stageLoad"), "done");
+    paint(document.getElementById("stageProgram"), "done");
+    paint(document.getElementById("stagePayment"), "done");
+    if (current === "running" && remaining > 0) {
+      paint(stageWashing, "active");
+      paint(stageRelease, "pending");
+    } else if (current === "running" && remaining <= 0) {
+      paint(stageWashing, "done");
+      paint(stageRelease, "active");
+    } else if (current === "finished") {
+      paint(stageWashing, "done");
+      paint(stageRelease, "done");
+    } else {
+      paint(stageWashing, "pending");
+      paint(stageRelease, "pending");
+    }
+  }
+
+  function pad(total) {
+    var m = Math.floor(total / 60);
+    var s = total % 60;
+    return String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0");
+  }
+
+  function tick() {
+    if (seconds <= 0) {
+      clearInterval(handle);
+      handle = null;
+      timer.textContent = "Done";
+      timerStatus.textContent = "Cycle complete";
+      if (progressState) { progressState.textContent = "complete"; progressState.className = "badge badge-success"; }
+      applyState("finished", 0);
+      return;
+    }
+    seconds -= 1;
+    timer.textContent = pad(seconds);
+    applyState("running", seconds);
+  }
+
+  function startTicking() {
+    if (handle) return;
+    handle = setInterval(tick, 1000);
+  }
+
+  function stopTicking() {
+    if (handle) clearInterval(handle);
+    handle = null;
+  }
+
+  if (timer && state === "running" && seconds > 0) {
+    timer.textContent = pad(seconds);
+    startTicking();
+  } else if (timer && state === "finished") {
+    timer.textContent = "Done";
+  }
+
+  applyState(state, seconds);
+
+  pauseButton.addEventListener("click", function () {
+    if (state !== "running" || seconds <= 0) return;
+    paused = !paused;
+    if (paused) {
+      stopTicking();
+      pauseLabel.textContent = "Resume";
+      pauseButton.className = "button button-success";
+      timerStatus.textContent = "Paused";
+      controlStatus.textContent = "Cycle paused.";
+      if (progressState) { progressState.textContent = "paused"; progressState.className = "badge badge-muted"; }
+    } else {
+      startTicking();
+      pauseLabel.textContent = "Pause";
+      pauseButton.className = "button button-primary";
+      timerStatus.textContent = "Cycle running";
+      controlStatus.textContent = "Cycle resumed.";
+      if (progressState) { progressState.textContent = "running"; progressState.className = "badge badge-primary"; }
+    }
+  });
+
+  stopButton.addEventListener("click", function () {
+    stopTicking();
+    seconds = 0;
+    state = "finished";
+    if (timer) timer.textContent = "00:00";
+    if (timerStatus) timerStatus.textContent = "Cycle stopped";
+    if (progressState) { progressState.textContent = "stopped"; progressState.className = "badge badge-error"; }
+    if (controlStatus) controlStatus.textContent = "Emergency stop executed. Station reset to idle.";
+    paint(stageWashing, "done");
+    paint(stageRelease, "done");
+    fetch("/progress/release", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: "equipment_id={{ unit.id }}"
+    }).then(function () {
+      setTimeout(function () { window.location.href = "/progress"; }, 900);
+    });
+  });
+})();
+</script>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,291 @@
+{% extends "base.html" %}
+{% set active = 'equipment' %}
+{% block title %}Equipment // {{ facility_name }}{% endblock %}
+{% block content %}
+
+<div class="stack">
+
+  <div class="row space-between align-end row-wrap gap-medium">
+    <div>
+      <div class="monospace text-mini dim uppercase">Admin Console</div>
+      <h1 class="text-title semibold">Equipment</h1>
+    </div>
+    <div class="row gap-small row-wrap">
+      <button type="button" class="button button-primary" onclick="openAddStation()">+ Add Station</button>
+    </div>
+  </div>
+
+  <div class="columns-four gap-small">
+    {% for unit in units %}
+    <div class="card card-muted">
+      <div class="row space-between align-center space-below-small">
+        <span class="monospace semibold tone-primary">Bay #{{ '%02d'|format(unit.station_number) }}</span>
+        <span class="badge {% if unit.state == 'running' %}badge-primary{% elif unit.state == 'available' %}badge-success{% elif unit.state == 'finished' %}badge-success{% else %}badge-muted{% endif %}">{{ unit.state }}</span>
+      </div>
+
+      <div class="card card-strong space-below-small" style="text-align: center; padding: 0.5rem;">
+        <div class="text-large monospace semibold">{{ '%.2f'|format(unit.load_kg) }}<span class="text-mini dim">kg</span></div>
+        <div class="monospace text-mini dim">{{ format_temperature(unit.temperature_celsius) }} · {{ format_rotation(unit.rotation_rpm) }}</div>
+      </div>
+
+      <div class="columns-two gap-small space-below-small">
+        <div class="monospace text-mini dim">Door: <span style="color: #dde2f8;">{{ 'Closed' if unit.is_door_closed else 'Open' }}</span></div>
+        <div class="monospace text-mini dim">Seal: <span style="color: #dde2f8;">{{ 'Latched' if unit.is_sealed else 'Free' }}</span></div>
+      </div>
+
+      <div class="meter space-below-small">
+        <div class="meter-fill primary" style="width: {{ format_capacity_percentage(unit.load_kg, unit.capacity_kg) }}%;"></div>
+      </div>
+
+      <div class="station-actions">
+        <button type="button" class="button button-secondary" onclick="askSeal('/equipment/{{ unit.id }}/seal', '{{ unit.is_sealed }}' === 'True')">{% if unit.is_sealed %}Unlock{% else %}Lock{% endif %}</button>
+        <button type="button" class="button button-danger" onclick="askDelete('/equipment/{{ unit.id }}/delete', 'Delete this station?', 'This removes the station permanently.')">Delete</button>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="card panel-scroll">
+    <div class="panel-scroll-header">
+      <h2 class="text-large semibold">Accounts</h2>
+      <div class="row gap-small align-center">
+        <span class="monospace text-mini dim">{{ accounts|length }} total</span>
+        <button type="button" class="button button-primary" onclick="openAddAccount()" style="font-size: 10px; padding: 0.3rem 0.6rem;">+ Add Account</button>
+      </div>
+    </div>
+    <div class="panel-scroll-body">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th style="width: 18%;">Name</th>
+            <th style="width: 14%;">Role</th>
+            <th style="width: 18%;">Username</th>
+            <th style="width: 14%;">Password</th>
+            <th style="width: 12%;">Balance</th>
+            <th class="align-text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for acct in accounts %}
+          <tr>
+            <td class="semibold">{{ acct.display_name }}</td>
+            <td><span class="badge {% if acct.role == 'admin' %}badge-success{% else %}badge-primary{% endif %}">{{ acct.role }}</span></td>
+            <td class="monospace text-mini">{{ acct.contact_number }}</td>
+            <td class="monospace text-mini">{{ acct.credential }}</td>
+            <td class="monospace tone-success heavy">{{ format_currency(acct.balance) }}</td>
+            <td class="align-text-right">
+              <div class="row gap-tight align-center" style="justify-content: flex-end; flex-wrap: wrap;">
+                <button type="button" class="button button-secondary" style="font-size: 10px; padding: 0.3rem 0.6rem;" onclick="askCredit('/accounts/{{ acct.id }}/credit', 500, '{{ acct.display_name }}')">+500</button>
+                <button type="button" class="button button-secondary" style="font-size: 10px; padding: 0.3rem 0.6rem;" onclick="askCredit('/accounts/{{ acct.id }}/credit', 1000, '{{ acct.display_name }}')">+1000</button>
+                <button type="button" class="button button-primary" style="font-size: 10px; padding: 0.3rem 0.6rem;" onclick="askSetBalance('/accounts/{{ acct.id }}/balance', '{{ acct.display_name }}')">Set</button>
+                <button type="button" class="button button-danger" style="font-size: 10px; padding: 0.3rem 0.6rem;" onclick="askDelete('/accounts/{{ acct.id }}/delete', 'Delete this account?', 'This removes the account permanently.')">Delete</button>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<div id="addStationBackdrop" style="display:none;position:fixed;inset:0;z-index:9998;background:rgba(8,14,29,0.75);align-items:center;justify-content:center;padding:1rem;">
+  <div class="card" style="max-width:24rem;width:100%;">
+    <h2 class="text-large semibold space-below-small">Add Station</h2>
+    <p class="text-small dim space-below-medium">Enter the new station number.</p>
+    <form method="post" action="/equipment/add" class="stack">
+      <div class="row row-column gap-tight">
+        <label class="monospace text-mini dim uppercase">Station Number</label>
+        <input name="station_number" type="number" min="1" class="input-field monospace" required>
+      </div>
+      <div class="row gap-small">
+        <button type="button" class="button button-secondary flex-grow space-center" onclick="closeAddStation()">Cancel</button>
+        <button type="submit" class="button button-primary flex-grow space-center">Add Station</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="addAccountBackdrop" style="display:none;position:fixed;inset:0;z-index:9998;background:rgba(8,14,29,0.75);align-items:center;justify-content:center;padding:1rem;">
+  <div class="card" style="max-width:24rem;width:100%;">
+    <h2 class="text-large semibold space-below-small">Add Account</h2>
+    <p class="text-small dim space-below-medium">Create a new account.</p>
+    <form method="post" action="/accounts/add" class="stack">
+      <div class="row row-column gap-tight">
+        <label class="monospace text-mini dim uppercase">Display Name</label>
+        <input name="display_name" class="input-field" required>
+      </div>
+      <div class="row row-column gap-tight">
+        <label class="monospace text-mini dim uppercase">Username (Contact Number)</label>
+        <input name="contact_number" class="input-field monospace" required>
+      </div>
+      <div class="row row-column gap-tight">
+        <label class="monospace text-mini dim uppercase">Password (Credential / PIN)</label>
+        <input name="credential" type="text" class="input-field monospace" required>
+      </div>
+      <div class="row row-column gap-tight">
+        <label class="monospace text-mini dim uppercase">Role</label>
+        <select name="role" class="input-field monospace">
+          <option value="client">Client</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+      <div class="row gap-small">
+        <button type="button" class="button button-secondary flex-grow space-center" onclick="closeAddAccount()">Cancel</button>
+        <button type="submit" class="button button-primary flex-grow space-center">Create Account</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="confirmBackdrop" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(8,14,29,0.75);align-items:center;justify-content:center;padding:1rem;">
+  <div class="card" style="max-width:22rem;width:100%;text-align:center;">
+    <div class="text-title" id="confirmIcon" style="color:#ffb4ab;margin-bottom:0.75rem;">!</div>
+    <h2 class="text-large semibold space-below-small" id="confirmTitle">Are you sure?</h2>
+    <p class="text-small dim space-below-medium" id="confirmMessage">This cannot be undone.</p>
+    <div class="row gap-small">
+      <button type="button" class="button button-secondary flex-grow space-center" onclick="closeConfirm()">Cancel</button>
+      <button type="button" class="button button-primary flex-grow space-center" id="confirmYes">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<div id="setBalanceBackdrop" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(8,14,29,0.75);align-items:center;justify-content:center;padding:1rem;">
+  <div class="card" style="max-width:22rem;width:100%;text-align:center;">
+    <h2 class="text-large semibold space-below-small" id="setBalanceTitle">Set Balance</h2>
+    <p class="text-small dim space-below-medium" id="setBalanceMessage">Enter the new balance.</p>
+    <form id="setBalanceForm" method="post" action="" class="stack">
+      <input id="setBalanceAmount" name="amount" type="number" step="0.01" min="0" value="0" class="input-field monospace" required>
+      <div class="row gap-small">
+        <button type="button" class="button button-secondary flex-grow space-center" onclick="closeSetBalance()">Cancel</button>
+        <button type="submit" class="button button-primary flex-grow space-center">Set Balance</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function () {
+  var stationBackdrop = document.getElementById("addStationBackdrop");
+  var accountBackdrop = document.getElementById("addAccountBackdrop");
+  var confirmBackdrop = document.getElementById("confirmBackdrop");
+  var confirmTitle = document.getElementById("confirmTitle");
+  var confirmMessage = document.getElementById("confirmMessage");
+  var confirmIcon = document.getElementById("confirmIcon");
+  var confirmYes = document.getElementById("confirmYes");
+  var pendingAction = "";
+  var pendingBody = "";
+
+  var setBalanceBackdrop = document.getElementById("setBalanceBackdrop");
+  var setBalanceForm = document.getElementById("setBalanceForm");
+  var setBalanceTitle = document.getElementById("setBalanceTitle");
+  var setBalanceMessage = document.getElementById("setBalanceMessage");
+  var setBalanceAmount = document.getElementById("setBalanceAmount");
+
+  window.openAddStation = function () { stationBackdrop.style.display = "flex"; };
+  window.closeAddStation = function () { stationBackdrop.style.display = "none"; };
+  window.openAddAccount = function () { accountBackdrop.style.display = "flex"; };
+  window.closeAddAccount = function () { accountBackdrop.style.display = "none"; };
+
+  function openConfirm(action, title, message, tone, buttonLabel, body) {
+    pendingAction = action;
+    pendingBody = body || "";
+    confirmTitle.textContent = title || "Are you sure?";
+    confirmMessage.textContent = message || "";
+    confirmIcon.textContent = tone === "info" ? "i" : "!";
+    confirmIcon.style.color = tone === "info" ? "#4cd7f6" : "#ffb4ab";
+    confirmYes.textContent = buttonLabel || "Confirm";
+    if (tone === "info") {
+      confirmYes.className = "button button-success flex-grow space-center";
+      confirmYes.style.background = "";
+      confirmYes.style.borderColor = "";
+      confirmYes.style.color = "";
+      confirmYes.style.fontWeight = "";
+    } else {
+      confirmYes.className = "button button-danger flex-grow space-center";
+      confirmYes.style.background = "rgba(255, 180, 171, 0.15)";
+      confirmYes.style.borderColor = "#ffb4ab";
+      confirmYes.style.color = "#ffb4ab";
+      confirmYes.style.fontWeight = "700";
+    }
+    confirmBackdrop.style.display = "flex";
+  }
+
+  window.askSeal = function (action, isSealed) {
+    openConfirm(
+      action,
+      isSealed ? "Unlock this door?" : "Lock this door?",
+      isSealed ? "The solenoid will release and the door can be opened." : "The solenoid will latch and the door will be sealed.",
+      "info",
+      isSealed ? "Unlock" : "Lock"
+    );
+  };
+
+  window.askCredit = function (action, amount, name) {
+    openConfirm(
+      action,
+      "Credit " + name + "?",
+      "Add ₱" + amount.toFixed(2) + " to " + name + "'s wallet.",
+      "info",
+      "Credit",
+      "amount=" + encodeURIComponent(amount)
+    );
+  };
+
+  window.askDelete = function (action, title, message) {
+    openConfirm(action, title, message, "error", "Confirm Delete");
+  };
+
+  window.closeConfirm = function () {
+    confirmBackdrop.style.display = "none";
+    pendingAction = "";
+    pendingBody = "";
+  };
+
+  confirmYes.addEventListener("click", function () {
+    if (!pendingAction) return;
+    var form = document.createElement("form");
+    form.method = "post";
+    form.action = pendingAction;
+    if (pendingBody) {
+      var hidden = document.createElement("input");
+      hidden.type = "hidden";
+      var parts = pendingBody.split("=");
+      hidden.name = decodeURIComponent(parts[0]);
+      hidden.value = decodeURIComponent(parts[1] || "");
+      form.appendChild(hidden);
+    }
+    document.body.appendChild(form);
+    form.submit();
+  });
+
+  window.askSetBalance = function (action, name) {
+    setBalanceForm.action = action;
+    setBalanceTitle.textContent = "Set Balance";
+    setBalanceMessage.textContent = "Enter the new balance for " + name + ".";
+    setBalanceAmount.value = "0";
+    setBalanceBackdrop.style.display = "flex";
+    setTimeout(function () { setBalanceAmount.focus(); }, 50);
+  };
+
+  window.closeSetBalance = function () {
+    setBalanceBackdrop.style.display = "none";
+  };
+
+  stationBackdrop.addEventListener("click", function (event) {
+    if (event.target === stationBackdrop) closeAddStation();
+  });
+  accountBackdrop.addEventListener("click", function (event) {
+    if (event.target === accountBackdrop) closeAddAccount();
+  });
+  confirmBackdrop.addEventListener("click", function (event) {
+    if (event.target === confirmBackdrop) closeConfirm();
+  });
+  setBalanceBackdrop.addEventListener("click", function (event) {
+    if (event.target === setBalanceBackdrop) closeSetBalance();
+  });
+})();
+</script>
+
+{% endblock %}

@@ -1,0 +1,88 @@
+{% extends "public_base.html" %}
+{% set hide_nav = true %}
+{% block title %}Login // {{ facility_name }}{% endblock %}
+{% block content %}
+
+<div style="min-height: calc(100vh - 8rem); display: flex; align-items: center; justify-content: center; padding: 2rem 1rem;">
+  <div style="width: 100%; max-width: 420px;">
+
+    <div style="text-align: center; margin-bottom: 1.75rem;">
+      <span class="monospace text-mini tone-primary uppercase semibold">Secure Access</span>
+      <h1 class="text-headline semibold" id="cardHeading" style="margin: 0.5rem 0 0;">Welcome</h1>
+      <p class="text-small dim" id="cardSubheading" style="margin: 0.5rem 0 0;">Sign in to your account.</p>
+    </div>
+
+    <div class="card" style="padding: 1.75rem;">
+
+      {% if error %}
+      <div class="card card-muted space-below-medium" style="padding: 0.6rem 0.9rem; border-color: #ffb4ab;">
+        <div class="text-small tone-error">{{ error }}</div>
+      </div>
+      {% endif %}
+
+      {% if success %}
+      <div class="card card-muted space-below-medium" style="padding: 0.6rem 0.9rem; border-color: #4edea3;">
+        <div class="text-small tone-success">{{ success }}</div>
+      </div>
+      {% endif %}
+
+      <form method="post" action="/access" id="loginForm" style="display: flex; flex-direction: column; gap: 0.75rem;">
+        <input name="contact" class="input-field monospace" placeholder="Contact number" required>
+        <input name="credential" type="password" class="input-field monospace" placeholder="PIN or password" required>
+        <button type="submit" class="button button-primary full-width space-center" style="margin-top: 0.5rem;">Login</button>
+      </form>
+
+      <form method="post" action="/register" id="registerForm" style="display: none; flex-direction: column; gap: 0.75rem;">
+        <input name="display_name" class="input-field" placeholder="Full name" required>
+        <input name="contact_number" class="input-field monospace" placeholder="Contact number" required>
+        <input name="credential" type="password" class="input-field monospace" placeholder="Choose a PIN" required>
+        <input name="confirm" type="password" class="input-field monospace" placeholder="Confirm PIN" required>
+        <button type="submit" class="button button-primary full-width space-center" style="margin-top: 0.5rem;">Create Account</button>
+      </form>
+
+      <div style="text-align: center; margin-top: 1.25rem; padding-top: 1.25rem; border-top: 1px solid #3d494c;">
+        <span id="togglePrompt" class="text-small dim">Don't have an account?</span>
+        <button type="button" id="toggleButton" class="button button-secondary" onclick="toggleCard()" style="margin-left: 0.5rem; font-size: 11px; padding: 0.4rem 0.9rem;">Create Account</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var mode = "login";
+
+  function setMode(next) {
+    mode = next;
+    var loginForm = document.getElementById("loginForm");
+    var registerForm = document.getElementById("registerForm");
+    var heading = document.getElementById("cardHeading");
+    var subheading = document.getElementById("cardSubheading");
+    var toggle = document.getElementById("toggleButton");
+    var prompt = document.getElementById("togglePrompt");
+
+    if (mode === "login") {
+      loginForm.style.display = "flex";
+      registerForm.style.display = "none";
+      heading.textContent = "Welcome";
+      subheading.textContent = "Sign in to your account.";
+      prompt.textContent = "Don't have an account?";
+      toggle.textContent = "Create Account";
+    } else {
+      loginForm.style.display = "none";
+      registerForm.style.display = "flex";
+      heading.textContent = "Create Account";
+      subheading.textContent = "Register a new client account.";
+      prompt.textContent = "Already have an account?";
+      toggle.textContent = "Back to Login";
+    }
+  }
+
+  window.toggleCard = function () {
+    setMode(mode === "login" ? "register" : "login");
+  };
+})();
+</script>
+
+{% endblock %}

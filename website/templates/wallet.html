@@ -1,0 +1,66 @@
+{% extends "public_base.html" %}
+{% set active = 'wallet' %}
+{% block title %}Wallet // {{ facility_name }}{% endblock %}
+{% block content %}
+
+<div style="max-width: 1400px; margin: 0 auto;">
+
+  <div class="space-below-large">
+    <h1 class="text-headline semibold">My Wallet &amp; Laundry Trips</h1>
+    <p class="text-base dim" style="margin-top: 0.5rem;">Your balance is topped up at the admin counter.</p>
+  </div>
+
+  <div class="split-narrow-wide">
+
+    <div class="card">
+      <div class="row space-between align-start space-below-large row-wrap gap-small">
+        <div>
+          <div class="monospace text-mini dim uppercase">Account Holder</div>
+          <div class="text-title semibold">{{ account.display_name }}</div>
+          <div class="text-mini monospace tone-primary">{{ account.contact_number }}</div>
+        </div>
+        <span class="badge badge-success">Active</span>
+      </div>
+
+      <div class="card card-muted space-below-large">
+        <div class="monospace text-mini dim uppercase space-below-small">Your Balance</div>
+        <div class="text-headline monospace tone-success semibold">{{ format_currency(account.balance) }}</div>
+      </div>
+
+      <div class="card card-muted">
+        <div class="monospace text-mini dim uppercase space-below-small">Top-Up Information</div>
+        <div class="text-small dim">Add funds by paying cash at the admin counter. The admin will credit your account instantly.</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 class="text-title semibold space-below-large">Recent Laundry Trips</h2>
+      {% if trips %}
+      <div style="overflow-x: auto;">
+        <table class="data-table">
+          <thead>
+            <tr><th>Date</th><th>Station</th><th>Load</th><th>Cycle</th><th>Amount</th></tr>
+          </thead>
+          <tbody>
+            {% for trip in trips %}
+            <tr>
+              <td class="monospace text-mini">{{ format_moment(trip.started_at) }}</td>
+              <td class="monospace tone-primary">{{ format_bay_label(trip.station_number) }}</td>
+              <td class="monospace">{{ format_load(trip.load_kg) }}</td>
+              <td>{{ trip.cycle_label }}</td>
+              <td class="monospace tone-success heavy">{{ format_currency(trip.amount_paid) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="text-small dim">No laundry trips recorded yet.</p>
+      {% endif %}
+    </div>
+
+  </div>
+
+</div>
+
+{% endblock %}
