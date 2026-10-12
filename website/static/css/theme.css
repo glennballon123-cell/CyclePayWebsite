@@ -734,6 +734,7 @@ body {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 0.75rem;
+  width: 100%;
 }
 
 .progress-stages .card {
@@ -745,15 +746,16 @@ body {
   justify-content: center;
   align-items: center;
   gap: 0.25rem;
+  overflow: hidden;
+  width: 100%;
+  min-width: 0;
 }
 
-.progress-stages .card .monospace {
-  white-space: nowrap;
-  font-size: 10px;
-}
-
+.progress-stages .card .monospace,
 .progress-stages .card .text-small {
-  font-size: 13px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
