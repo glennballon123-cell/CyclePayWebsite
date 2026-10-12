@@ -730,6 +730,33 @@ body {
   display: block;
 }
 
+.progress-stages {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.progress-stages .card {
+  text-align: center;
+  padding: 0.75rem 0.5rem;
+  min-height: 4.5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.progress-stages .card .monospace {
+  white-space: nowrap;
+  font-size: 10px;
+}
+
+.progress-stages .card .text-small {
+  font-size: 13px;
+  white-space: nowrap;
+}
+
 @media (max-width: 1400px) {
   .columns-four {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -832,6 +859,13 @@ body {
     display: block;
     overflow-x: auto;
     white-space: nowrap;
+  }
+  .progress-stages {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .progress-stages #stageWashing,
+  .progress-stages #stageRelease {
+    grid-column: span 3;
   }
 }
 
