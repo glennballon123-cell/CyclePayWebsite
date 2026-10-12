@@ -3,6 +3,10 @@
 {% block title %}Equipment // {{ facility_name }}{% endblock %}
 {% block content %}
 
+<div id="existingStations" style="display:none;">
+  {% for unit in units %}<span data-number="{{ unit.station_number }}"></span>{% endfor %}
+</div>
+
 <div class="stack">
 
   <div class="row space-between align-end row-wrap gap-medium">
@@ -94,14 +98,14 @@
   <div class="card" style="max-width:24rem;width:100%;">
     <h2 class="text-large semibold space-below-small">Add Station</h2>
     <p class="text-small dim space-below-medium">Enter the new station number.</p>
-    <form method="post" action="/equipment/add" class="stack">
+    <form method="post" action="/equipment/add" id="addStationForm" class="stack">
       <div class="row row-column gap-tight">
         <label class="monospace text-mini dim uppercase">Station Number</label>
-        <input name="station_number" type="number" min="1" class="input-field monospace" required>
+        <input name="station_number" id="addStationInput" type="number" min="1" class="input-field monospace" required>
       </div>
       <div class="row gap-small">
         <button type="button" class="button button-secondary flex-grow space-center" onclick="closeAddStation()">Cancel</button>
-        <button type="submit" class="button button-primary flex-grow space-center">Add Station</button>
+        <button type="button" class="button button-primary flex-grow space-center" onclick="submitAddStation()">Add Station</button>
       </div>
     </form>
   </div>
@@ -165,6 +169,17 @@
   </div>
 </div>
 
+<div id="noticeBackdrop" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(8,14,29,0.75);align-items:center;justify-content:center;padding:1rem;">
+  <div class="card" style="max-width:22rem;width:100%;text-align:center;">
+    <div class="text-title" id="noticeIcon" style="color:#ffb4ab;margin-bottom:0.75rem;">!</div>
+    <h2 class="text-large semibold space-below-small" id="noticeTitle">Notice</h2>
+    <p class="text-small dim space-below-medium" id="noticeMessage">Something needs your attention.</p>
+    <div class="row space-center">
+      <button type="button" class="button button-primary" id="noticeOk" style="min-width:8rem;justify-content:center;">Got it</button>
+    </div>
+  </div>
+</div>
+
 <script>
 (function () {
   var stationBackdrop = document.getElementById("addStationBackdrop");
@@ -183,10 +198,54 @@
   var setBalanceMessage = document.getElementById("setBalanceMessage");
   var setBalanceAmount = document.getElementById("setBalanceAmount");
 
+  var noticeBackdrop = document.getElementById("noticeBackdrop");
+  var noticeIcon = document.getElementById("noticeIcon");
+  var noticeTitle = document.getElementById("noticeTitle");
+  var noticeMessage = document.getElementById("noticeMessage");
+
   window.openAddStation = function () { stationBackdrop.style.display = "flex"; };
   window.closeAddStation = function () { stationBackdrop.style.display = "none"; };
   window.openAddAccount = function () { accountBackdrop.style.display = "flex"; };
   window.closeAddAccount = function () { accountBackdrop.style.display = "none"; };
+
+  function showNotice(title, message, tone) {
+    var colors = { error: "#ffb4ab", warning: "#f5a524", info: "#4cd7f6" };
+    var picked = colors[tone] || colors.error;
+    noticeIcon.style.color = picked;
+    noticeIcon.textContent = tone === "info" ? "i" : "!";
+    noticeTitle.textContent = title;
+    noticeMessage.textContent = message;
+    noticeBackdrop.style.display = "flex";
+  }
+
+  function closeNotice() {
+    noticeBackdrop.style.display = "none";
+  }
+
+  document.getElementById("noticeOk").addEventListener("click", closeNotice);
+  noticeBackdrop.addEventListener("click", function (event) {
+    if (event.target === noticeBackdrop) closeNotice();
+  });
+
+  window.submitAddStation = function () {
+    var input = document.getElementById("addStationInput");
+    var value = parseInt(input.value, 10);
+    if (!value || value < 1) {
+      showNotice("Invalid Number", "Enter a station number greater than zero.", "warning");
+      return;
+    }
+    var taken = false;
+    document.querySelectorAll("#existingStations span").forEach(function (node) {
+      if (parseInt(node.dataset.number, 10) === value) {
+        taken = true;
+      }
+    });
+    if (taken) {
+      showNotice("Station Already Exists", "Bay #" + String(value).padStart(2, "0") + " is already in use. Choose a different number.", "error");
+      return;
+    }
+    document.getElementById("addStationForm").submit();
+  };
 
   function openConfirm(action, title, message, tone, buttonLabel, body) {
     pendingAction = action;
