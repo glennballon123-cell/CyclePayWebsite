@@ -1,10 +1,10 @@
 import json
+import os
 from dataclasses import dataclass, asdict
 from datetime import datetime
 from itertools import count
-from vercel import blob
 
-BLOB_PATH = "laundry.json"
+DATA_FILE = os.environ.get("DATA_FILE", "laundry.json")
 
 
 @dataclass
@@ -92,11 +92,10 @@ class Store:
         }
 
     def load(self):
-        try:
-            response = blob.get(BLOB_PATH)
-            raw = json.loads(response)
-        except Exception:
+        if not os.path.exists(DATA_FILE):
             return False
+        with open(DATA_FILE, "r", encoding="utf-8") as handle:
+            raw = json.load(handle)
         for row in raw.get("accounts", []):
             self.accounts[row["id"]] = Account(**row)
         for row in raw.get("equipment", []):
@@ -118,13 +117,11 @@ class Store:
         return True
 
     def save(self):
-        payload = json.dumps(self.to_dict(), indent=2)
-        blob.upload_file(
-            local_path=None,
-            path=BLOB_PATH,
-            access="public",
-            data=payload.encode("utf-8"),
-        )
+        folder = os.path.dirname(DATA_FILE)
+        if folder:
+            os.makedirs(folder, exist_ok=True)
+        with open(DATA_FILE, "w", encoding="utf-8") as handle:
+            json.dump(self.to_dict(), handle, indent=2)
 
 
 store = Store()
