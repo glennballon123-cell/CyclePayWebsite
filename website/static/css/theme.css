@@ -869,6 +869,17 @@ body {
   }
 }
 
+@media (max-width: 420px) {
+  .progress-stages {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .progress-stages #stagePayment,
+  .progress-stages #stageWashing,
+  .progress-stages #stageRelease {
+    grid-column: span 2;
+  }
+}
+
 @media (max-width: 480px) {
   .button {
     font-size: 11px;
