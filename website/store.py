@@ -1,10 +1,10 @@
 import json
-import os
 from dataclasses import dataclass, asdict
 from datetime import datetime
 from itertools import count
+from vercel import blob
 
-DATA_FILE = os.environ.get("DATA_FILE", "laundry.json")
+BLOB_PATH = "laundry.json"
 
 
 @dataclass
@@ -92,10 +92,11 @@ class Store:
         }
 
     def load(self):
-        if not os.path.exists(DATA_FILE):
+        try:
+            response = blob.get(BLOB_PATH)
+            raw = json.loads(response)
+        except Exception:
             return False
-        with open(DATA_FILE, "r", encoding="utf-8") as handle:
-            raw = json.load(handle)
         for row in raw.get("accounts", []):
             self.accounts[row["id"]] = Account(**row)
         for row in raw.get("equipment", []):
@@ -117,11 +118,13 @@ class Store:
         return True
 
     def save(self):
-        folder = os.path.dirname(DATA_FILE)
-        if folder:
-            os.makedirs(folder, exist_ok=True)
-        with open(DATA_FILE, "w", encoding="utf-8") as handle:
-            json.dump(self.to_dict(), handle, indent=2)
+        payload = json.dumps(self.to_dict(), indent=2)
+        blob.upload_file(
+            local_path=None,
+            path=BLOB_PATH,
+            access="public",
+            data=payload.encode("utf-8"),
+        )
 
 
 store = Store()
@@ -134,7 +137,7 @@ def persist():
 def seed():
     if store.accounts:
         return
-    create_account("Administrator", "09000000000", "admin123", "admin", 0.0)
+    create_account("Administrator", "09000000000", "admin123", "admin", 5000.0)
     for number in range(1, 5):
         create_equipment(number, "available", 0.0, 12.0)
     persist()
