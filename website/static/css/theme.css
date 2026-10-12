@@ -863,10 +863,12 @@ body {
     white-space: nowrap;
   }
   .progress-stages {
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
     gap: 0.5rem;
   }
   .progress-stages .card {
+    width: 100%;
     min-height: 3.5rem;
     flex-direction: row;
     justify-content: space-between;
