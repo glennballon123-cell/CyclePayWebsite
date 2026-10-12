@@ -31,8 +31,19 @@
         <div style="position: relative;">
           <input name="credential" id="loginCredential" type="password" class="input-field monospace" placeholder="PIN or password" required style="padding-right: 2.75rem;">
           <button type="button" class="pin-toggle" onclick="togglePin('loginCredential', this)" aria-label="Show password">
-            <span class="eye-open">&#128065;</span>
-            <span class="eye-closed" style="display:none;">&#128584;</span>
+            <span class="eye-open" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"></path>
+                <circle cx="12" cy="12" r="3.2"></circle>
+              </svg>
+            </span>
+            <span class="eye-closed" aria-hidden="true" style="display:none;">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"></path>
+                <circle cx="12" cy="12" r="3.2"></circle>
+                <line x1="3" y1="21" x2="21" y2="3"></line>
+              </svg>
+            </span>
           </button>
         </div>
         <button type="submit" class="button button-primary full-width space-center" style="margin-top: 0.25rem;">Login</button>
@@ -44,15 +55,37 @@
         <div style="position: relative;">
           <input name="credential" id="registerCredential" type="password" class="input-field monospace" placeholder="Choose a PIN" required style="padding-right: 2.75rem;">
           <button type="button" class="pin-toggle" onclick="togglePin('registerCredential', this)" aria-label="Show password">
-            <span class="eye-open">&#128065;</span>
-            <span class="eye-closed" style="display:none;">&#128584;</span>
+            <span class="eye-open" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"></path>
+                <circle cx="12" cy="12" r="3.2"></circle>
+              </svg>
+            </span>
+            <span class="eye-closed" aria-hidden="true" style="display:none;">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"></path>
+                <circle cx="12" cy="12" r="3.2"></circle>
+                <line x1="3" y1="21" x2="21" y2="3"></line>
+              </svg>
+            </span>
           </button>
         </div>
         <div style="position: relative;">
           <input name="confirm" id="registerConfirm" type="password" class="input-field monospace" placeholder="Confirm PIN" required style="padding-right: 2.75rem;">
           <button type="button" class="pin-toggle" onclick="togglePin('registerConfirm', this)" aria-label="Show password">
-            <span class="eye-open">&#128065;</span>
-            <span class="eye-closed" style="display:none;">&#128584;</span>
+            <span class="eye-open" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"></path>
+                <circle cx="12" cy="12" r="3.2"></circle>
+              </svg>
+            </span>
+            <span class="eye-closed" aria-hidden="true" style="display:none;">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"></path>
+                <circle cx="12" cy="12" r="3.2"></circle>
+                <line x1="3" y1="21" x2="21" y2="3"></line>
+              </svg>
+            </span>
           </button>
         </div>
         <button type="submit" class="button button-primary full-width space-center" style="margin-top: 0.5rem;">Create Account</button>
@@ -77,20 +110,29 @@
   border: none;
   cursor: pointer;
   padding: 0.5rem;
-  font-size: 16px;
   color: #bcc9cd;
   line-height: 1;
   transition: color 0.15s ease;
   min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .pin-toggle:hover {
   color: #4cd7f6;
 }
 
-.pin-toggle .eye-open,
+.pin-toggle svg {
+  display: block;
+}
+
 .pin-toggle .eye-closed {
-  display: inline-block;
+  display: none;
+}
+
+.pin-toggle .eye-closed.is-visible {
+  display: flex;
 }
 </style>
 
@@ -136,10 +178,10 @@
     if (input.type === "password") {
       input.type = "text";
       openEye.style.display = "none";
-      closedEye.style.display = "inline-block";
+      closedEye.style.display = "flex";
     } else {
       input.type = "password";
-      openEye.style.display = "inline-block";
+      openEye.style.display = "flex";
       closedEye.style.display = "none";
     }
   };
