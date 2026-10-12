@@ -28,15 +28,33 @@
 
       <form method="post" action="/access" id="loginForm" style="display: flex; flex-direction: column; gap: 0.75rem;">
         <input name="contact" class="input-field monospace" placeholder="Contact number" required>
-        <input name="credential" type="password" class="input-field monospace" placeholder="PIN or password" required>
-        <button type="submit" class="button button-primary full-width space-center" style="margin-top: 0.5rem;">Login</button>
+        <div style="position: relative;">
+          <input name="credential" id="loginCredential" type="password" class="input-field monospace" placeholder="PIN or password" required style="padding-right: 2.75rem;">
+          <button type="button" class="pin-toggle" onclick="togglePin('loginCredential', this)" aria-label="Show password">
+            <span class="eye-open">&#128065;</span>
+            <span class="eye-closed" style="display:none;">&#128584;</span>
+          </button>
+        </div>
+        <button type="submit" class="button button-primary full-width space-center" style="margin-top: 0.25rem;">Login</button>
       </form>
 
       <form method="post" action="/register" id="registerForm" style="display: none; flex-direction: column; gap: 0.75rem;">
         <input name="display_name" class="input-field" placeholder="Full name" required>
         <input name="contact_number" class="input-field monospace" placeholder="Contact number" required>
-        <input name="credential" type="password" class="input-field monospace" placeholder="Choose a PIN" required>
-        <input name="confirm" type="password" class="input-field monospace" placeholder="Confirm PIN" required>
+        <div style="position: relative;">
+          <input name="credential" id="registerCredential" type="password" class="input-field monospace" placeholder="Choose a PIN" required style="padding-right: 2.75rem;">
+          <button type="button" class="pin-toggle" onclick="togglePin('registerCredential', this)" aria-label="Show password">
+            <span class="eye-open">&#128065;</span>
+            <span class="eye-closed" style="display:none;">&#128584;</span>
+          </button>
+        </div>
+        <div style="position: relative;">
+          <input name="confirm" id="registerConfirm" type="password" class="input-field monospace" placeholder="Confirm PIN" required style="padding-right: 2.75rem;">
+          <button type="button" class="pin-toggle" onclick="togglePin('registerConfirm', this)" aria-label="Show password">
+            <span class="eye-open">&#128065;</span>
+            <span class="eye-closed" style="display:none;">&#128584;</span>
+          </button>
+        </div>
         <button type="submit" class="button button-primary full-width space-center" style="margin-top: 0.5rem;">Create Account</button>
       </form>
 
@@ -48,6 +66,33 @@
     </div>
   </div>
 </div>
+
+<style>
+.pin-toggle {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem;
+  font-size: 16px;
+  color: #bcc9cd;
+  line-height: 1;
+  transition: color 0.15s ease;
+  min-height: 0;
+}
+
+.pin-toggle:hover {
+  color: #4cd7f6;
+}
+
+.pin-toggle .eye-open,
+.pin-toggle .eye-closed {
+  display: inline-block;
+}
+</style>
 
 <script>
 (function () {
@@ -81,6 +126,22 @@
 
   window.toggleCard = function () {
     setMode(mode === "login" ? "register" : "login");
+  };
+
+  window.togglePin = function (inputId, button) {
+    var input = document.getElementById(inputId);
+    if (!input) return;
+    var openEye = button.querySelector(".eye-open");
+    var closedEye = button.querySelector(".eye-closed");
+    if (input.type === "password") {
+      input.type = "text";
+      openEye.style.display = "none";
+      closedEye.style.display = "inline-block";
+    } else {
+      input.type = "password";
+      openEye.style.display = "inline-block";
+      closedEye.style.display = "none";
+    }
   };
 })();
 </script>
