@@ -82,7 +82,9 @@
                 <button type="button" class="button button-secondary" style="font-size: 10px; padding: 0.3rem 0.6rem;" onclick="askCredit('/accounts/{{ acct.id }}/credit', 500, '{{ acct.display_name }}')">+500</button>
                 <button type="button" class="button button-secondary" style="font-size: 10px; padding: 0.3rem 0.6rem;" onclick="askCredit('/accounts/{{ acct.id }}/credit', 1000, '{{ acct.display_name }}')">+1000</button>
                 <button type="button" class="button button-primary" style="font-size: 10px; padding: 0.3rem 0.6rem;" onclick="askSetBalance('/accounts/{{ acct.id }}/balance', '{{ acct.display_name }}')">Set</button>
+                {% if acct.role != 'admin' %}
                 <button type="button" class="button button-danger" style="font-size: 10px; padding: 0.3rem 0.6rem;" onclick="askDelete('/accounts/{{ acct.id }}/delete', 'Delete this account?', 'This removes the account permanently.')">Delete</button>
+                {% endif %}
               </div>
             </td>
           </tr>
